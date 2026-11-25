@@ -32,7 +32,7 @@ describe('chooseLayout', () => {
   });
 
   it('should give the whole label to the text of a hardware type that has no drawing yet', () => {
-    const { iconZone, textZone } = chooseLayout({ ...screwSpec, hardwareType: 'hook', drive: null }, font);
+    const { iconZone, textZone } = chooseLayout({ ...screwSpec, hardwareType: 'mollyAnchor', drive: null }, font);
 
     assert.equal(iconZone, null);
     assert.ok(textZone.width > screwSpec.width * 0.8);

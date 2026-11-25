@@ -55,6 +55,17 @@ const EYE_SCREW = {
   shankEnd: 3.3,
   tipEnd: 3.7,
 };
+const HOOK = {
+  bendCenter: { x: 1, y: -0.42 },
+  bendRadius: 0.42,
+  hookEnd: 1.25,
+  shankRadius: 0.12,
+  threadOverhang: 0.05,
+  threadStart: 1.6,
+  threadPitch: 0.16,
+  shankEnd: 3.3,
+  tipEnd: 3.7,
+};
 const TOP = -1;
 const BOTTOM = 1;
 
@@ -200,6 +211,31 @@ function drawEyeScrew() {
   };
 }
 
+function hookBody() {
+  const bendOutside = { center: HOOK.bendCenter, radius: HOOK.bendRadius + HOOK.shankRadius };
+  const bendInside = { center: HOOK.bendCenter, radius: HOOK.bendRadius - HOOK.shankRadius };
+  const hookTop = HOOK.bendCenter.y - HOOK.bendRadius;
+  const roundedEnd = { center: { x: HOOK.hookEnd, y: hookTop }, radius: HOOK.shankRadius };
+  const bendStart = HOOK.bendCenter.x;
+  return [
+    { type: 'M', ...atSide(bendStart, HOOK.shankRadius, TOP) },
+    { type: 'L', ...atSide(HOOK.shankEnd, HOOK.shankRadius, TOP) },
+    { type: 'L', x: HOOK.tipEnd, y: 0 },
+    { type: 'L', ...atSide(HOOK.shankEnd, HOOK.shankRadius, BOTTOM) },
+    { type: 'L', ...atSide(bendStart, HOOK.shankRadius, BOTTOM) },
+    ...arc({ ...bendOutside, fromAngle: (3 * Math.PI) / 2, toAngle: Math.PI / 2 }),
+    { type: 'L', x: HOOK.hookEnd, y: hookTop - HOOK.shankRadius },
+    ...arc({ ...roundedEnd, fromAngle: Math.PI / 2, toAngle: -Math.PI / 2 }),
+    { type: 'L', x: bendStart, y: hookTop + HOOK.shankRadius },
+    ...arc({ ...bendInside, fromAngle: Math.PI / 2, toAngle: (3 * Math.PI) / 2 }),
+    { type: 'Z' },
+  ];
+}
+
+function drawHook() {
+  return { outline: solid(hookBody()), strokes: diagonalThreadStrokes(HOOK) };
+}
+
 function gapBetweenDiagonalThreads(piece) {
   const threadRise = 2 * threadReachOf(piece);
   return (piece.threadPitch * threadRise) / Math.hypot(piece.threadPitch / 2, threadRise);
@@ -207,6 +243,7 @@ function gapBetweenDiagonalThreads(piece) {
 
 const HARDWARE_DRAWINGS = {
   screw: { draw: drawScrew, thinnestDetail: Math.min(gapBetweenDiagonalThreads(SCREW), 2 * SCREW.shankRadius) },
+  hook: { draw: drawHook, thinnestDetail: Math.min(gapBetweenDiagonalThreads(HOOK), 2 * HOOK.shankRadius) },
   eyeScrew: {
     draw: drawEyeScrew,
     thinnestDetail: Math.min(gapBetweenDiagonalThreads(EYE_SCREW), EYE_SCREW.eyeRadius - EYE_SCREW.eyeHoleRadius),
@@ -216,7 +253,7 @@ const HARDWARE_DRAWINGS = {
   nut: { draw: drawNut, thinnestDetail: NUT.hexRadius * Math.cos(Math.PI / 6) - NUT.holeRadius },
 };
 
-const HARDWARE_WAITING_FOR_A_DRAWING = ['hook', 'wallPlug', 'mollyAnchor'];
+const HARDWARE_WAITING_FOR_A_DRAWING = ['wallPlug', 'mollyAnchor'];
 
 export function isHardwareDrawingPending(hardwareTypeKey) {
   return HARDWARE_WAITING_FOR_A_DRAWING.includes(hardwareTypeKey);

@@ -187,7 +187,7 @@ describe('renderLabel', () => {
   });
 
   it('should draw no silhouette for a hardware type that has no drawing yet', () => {
-    const svg = parseSvg(renderLabel({ ...screwSpec, hardwareType: 'hook', drive: null }, font));
+    const svg = parseSvg(renderLabel({ ...screwSpec, hardwareType: 'mollyAnchor', drive: null }, font));
 
     assert.equal(pathsWithAttribute(svg, 'data-hardware-outline').length, 0);
   });
