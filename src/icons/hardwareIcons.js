@@ -57,18 +57,20 @@ const EYE_SCREW = {
   tipEnd: 3.7,
 };
 const HOOK = {
+  loopCenter: { x: 0.67, y: 0 },
   loopRadius: 0.55,
-  loopEndAngle: Math.PI / 4,
-  junction: 1.2,
-  collarStart: 1.55,
-  collarEnd: 1.7,
+  loopEndAngle: (5 * Math.PI) / 3,
+  bendLength: 0.45,
+  junction: 1.6,
+  collarStart: 1.95,
+  collarEnd: 2.1,
   collarRadius: 0.17,
   shankRadius: 0.12,
   threadOverhang: 0.05,
-  threadStart: 1.95,
+  threadStart: 2.35,
   threadPitch: 0.16,
-  shankEnd: 3.4,
-  tipEnd: 3.8,
+  shankEnd: 3.8,
+  tipEnd: 4.2,
 };
 const WALL_PLUG = {
   collarRadius: 0.4,
@@ -263,18 +265,46 @@ function hookEdge(side) {
   ];
 }
 
+function bendTowardsLoopTop(offset) {
+  const loopTop = HOOK.loopCenter.y - HOOK.loopRadius;
+  return {
+    type: 'C',
+    x1: HOOK.junction - HOOK.bendLength,
+    y1: offset,
+    x2: HOOK.loopCenter.x + HOOK.bendLength,
+    y2: loopTop + offset,
+    x: HOOK.loopCenter.x,
+    y: loopTop + offset,
+  };
+}
+
+function bendTowardsShank(offset) {
+  const loopTop = HOOK.loopCenter.y - HOOK.loopRadius;
+  return {
+    type: 'C',
+    x1: HOOK.loopCenter.x + HOOK.bendLength,
+    y1: loopTop + offset,
+    x2: HOOK.junction - HOOK.bendLength,
+    y2: offset,
+    x: HOOK.junction,
+    y: offset,
+  };
+}
+
 function hookBody() {
-  const loopCenter = { x: HOOK.junction, y: -HOOK.loopRadius };
-  const wireEnd = pointOnCircle({ center: loopCenter, radius: HOOK.loopRadius }, HOOK.loopEndAngle);
+  const loop = { center: HOOK.loopCenter };
+  const wireEnd = pointOnCircle({ ...loop, radius: HOOK.loopRadius }, HOOK.loopEndAngle);
   const [shankTopAtJunction, ...shankTop] = hookEdge(TOP);
   return [
     { type: 'M', ...shankTopAtJunction },
     ...shankTop.map((point) => ({ type: 'L', ...point })),
     { type: 'L', x: HOOK.tipEnd, y: 0 },
     ...hookEdge(BOTTOM).reverse().map((point) => ({ type: 'L', ...point })),
-    ...arc({ center: loopCenter, radius: HOOK.loopRadius + HOOK.shankRadius, fromAngle: (3 * Math.PI) / 2, toAngle: HOOK.loopEndAngle }),
-    ...arc({ center: wireEnd, radius: HOOK.shankRadius, fromAngle: HOOK.loopEndAngle, toAngle: HOOK.loopEndAngle - Math.PI }),
-    ...arc({ center: loopCenter, radius: HOOK.loopRadius - HOOK.shankRadius, fromAngle: HOOK.loopEndAngle, toAngle: (3 * Math.PI) / 2 }),
+    bendTowardsLoopTop(HOOK.shankRadius),
+    ...arc({ ...loop, radius: HOOK.loopRadius - HOOK.shankRadius, fromAngle: Math.PI / 2, toAngle: HOOK.loopEndAngle }),
+    ...arc({ center: wireEnd, radius: HOOK.shankRadius, fromAngle: HOOK.loopEndAngle + Math.PI, toAngle: HOOK.loopEndAngle }),
+    ...arc({ ...loop, radius: HOOK.loopRadius + HOOK.shankRadius, fromAngle: HOOK.loopEndAngle, toAngle: Math.PI / 2 }),
+    bendTowardsShank(-HOOK.shankRadius),
     { type: 'Z' },
   ];
 }

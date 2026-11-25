@@ -197,7 +197,7 @@ describe('drawHardwareIcon', () => {
     assert.ok(threads.length > 5, 'no diagonal threads');
   });
 
-  it('should draw a screw hook lying with a hook curving back on the left of a pointed threaded shank, in one contour', () => {
+  it('should draw a screw hook lying with a round loop on the left, centered on a pointed threaded shank, in one contour', () => {
     const { outline, strokes } = drawHardwareIcon('hook');
 
     const [contour, ...others] = contoursOf(outline);
@@ -205,7 +205,7 @@ describe('drawHardwareIcon', () => {
     assert.ok(contour.some(({ type }) => type === 'C'), 'the hook is not curved');
     const points = onCurvePointsOf(contour);
     const extent = extentOf(points);
-    const shankRadius = Math.min(...points.filter(({ y }) => y < 0 && y > extent.top / 2).map(({ y }) => -y));
+    const shankRadius = Math.min(...points.filter(({ y }) => y < 0 && !isAlmostEqual(y, 0) && y > extent.top / 2).map(({ y }) => -y));
     assert.ok(extent.top < -3 * shankRadius, 'the hook does not rise above the shank');
     const tip = cornersAt(points, extent.right);
     assert.equal(tip.length, 1);
@@ -214,8 +214,7 @@ describe('drawHardwareIcon', () => {
     const threads = strokesOf(strokes).filter(([start, end]) => !isAlmostEqual(start.x, end.x));
     assert.ok(threads.length > 5, 'no diagonal threads');
     assert.ok(Math.min(...threads.map(([start]) => start.x)) > hookEnd, 'the threads run under the hook');
-    const junction = Math.min(...points.filter(({ y }) => isAlmostEqual(y, shankRadius)).map(({ x }) => x));
-    assert.ok(points.some(({ x, y }) => x > junction && y < extent.top / 2), 'the hook does not curl back over the shank');
+    assert.ok(Math.abs(extent.top + extent.bottom) < 1e-3, 'the shank is not centered between the top and the bottom of the loop');
     assert.ok(!contour.some(({ type, y }) => type === 'L' && y < -2 * shankRadius), 'the hook has a straight part');
     assert.ok(points.some(({ y }) => y > shankRadius * 1.2), 'no collar before the threads');
   });
