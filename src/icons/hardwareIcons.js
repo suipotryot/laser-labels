@@ -66,6 +66,17 @@ const HOOK = {
   shankEnd: 3.3,
   tipEnd: 3.7,
 };
+const WALL_PLUG = {
+  collarRadius: 0.45,
+  collarDepth: 0.15,
+  bodyRadius: 0.26,
+  finRadius: 0.34,
+  finStart: 0.5,
+  finPitch: 0.3,
+  finCount: 7,
+  splitStart: 1.9,
+  end: 3,
+};
 const TOP = -1;
 const BOTTOM = 1;
 
@@ -236,6 +247,35 @@ function drawHook() {
   return { outline: solid(hookBody()), strokes: diagonalThreadStrokes(HOOK) };
 }
 
+function finEdge(side) {
+  return Array.from({ length: WALL_PLUG.finCount }, (_, index) => WALL_PLUG.finStart + index * WALL_PLUG.finPitch)
+    .flatMap((finX) => [
+      atSide(finX, WALL_PLUG.bodyRadius, side),
+      atSide(finX, WALL_PLUG.finRadius, side),
+      atSide(finX + WALL_PLUG.finPitch * 0.85, WALL_PLUG.bodyRadius, side),
+    ]);
+}
+
+function wallPlugEdge(side) {
+  return [
+    atSide(0, WALL_PLUG.collarRadius, side),
+    atSide(WALL_PLUG.collarDepth, WALL_PLUG.collarRadius, side),
+    atSide(WALL_PLUG.collarDepth, WALL_PLUG.bodyRadius, side),
+    ...finEdge(side),
+    atSide(WALL_PLUG.end, WALL_PLUG.bodyRadius, side),
+  ];
+}
+
+function drawWallPlug() {
+  return {
+    outline: mirroredOutline(wallPlugEdge),
+    strokes: [
+      ...verticalStroke(WALL_PLUG.collarDepth, WALL_PLUG.bodyRadius),
+      ...polyline([{ x: WALL_PLUG.splitStart, y: 0 }, { x: WALL_PLUG.end, y: 0 }]),
+    ],
+  };
+}
+
 function gapBetweenDiagonalThreads(piece) {
   const threadRise = 2 * threadReachOf(piece);
   return (piece.threadPitch * threadRise) / Math.hypot(piece.threadPitch / 2, threadRise);
@@ -244,6 +284,7 @@ function gapBetweenDiagonalThreads(piece) {
 const HARDWARE_DRAWINGS = {
   screw: { draw: drawScrew, thinnestDetail: Math.min(gapBetweenDiagonalThreads(SCREW), 2 * SCREW.shankRadius) },
   hook: { draw: drawHook, thinnestDetail: Math.min(gapBetweenDiagonalThreads(HOOK), 2 * HOOK.shankRadius) },
+  wallPlug: { draw: drawWallPlug, thinnestDetail: Math.min(WALL_PLUG.collarDepth, WALL_PLUG.finRadius - WALL_PLUG.bodyRadius) },
   eyeScrew: {
     draw: drawEyeScrew,
     thinnestDetail: Math.min(gapBetweenDiagonalThreads(EYE_SCREW), EYE_SCREW.eyeRadius - EYE_SCREW.eyeHoleRadius),
@@ -253,7 +294,7 @@ const HARDWARE_DRAWINGS = {
   nut: { draw: drawNut, thinnestDetail: NUT.hexRadius * Math.cos(Math.PI / 6) - NUT.holeRadius },
 };
 
-const HARDWARE_WAITING_FOR_A_DRAWING = ['wallPlug', 'mollyAnchor'];
+const HARDWARE_WAITING_FOR_A_DRAWING = ['mollyAnchor'];
 
 export function isHardwareDrawingPending(hardwareTypeKey) {
   return HARDWARE_WAITING_FOR_A_DRAWING.includes(hardwareTypeKey);

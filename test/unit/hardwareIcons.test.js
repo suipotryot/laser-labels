@@ -4,7 +4,7 @@ import { aspectRatioOfHardwareIcon, drawHardwareIcon, isHardwareDrawingPending, 
 import { hardwareTypes } from '../../src/catalog/hardwareTypes.js';
 import { contoursOf, cornersOf, extentOf, isAlmostEqual, onCurvePointsOf, windingOf } from './helpers/geometry.js';
 
-const DRAWN_HARDWARE = ['screw', 'nail', 'bolt', 'nut', 'eyeScrew', 'hook'];
+const DRAWN_HARDWARE = ['screw', 'nail', 'bolt', 'nut', 'eyeScrew', 'hook', 'wallPlug'];
 
 function cornersAt(corners, x) {
   return corners.filter((corner) => isAlmostEqual(corner.x, x));
@@ -215,6 +215,23 @@ describe('drawHardwareIcon', () => {
     const threads = strokesOf(strokes).filter(([start, end]) => !isAlmostEqual(start.x, end.x));
     assert.ok(threads.length > 5, 'no diagonal threads');
     assert.ok(Math.min(...threads.map(([start]) => start.x)) > hookEnd, 'the threads run under the hook');
+  });
+
+  it('should draw a wall plug lying with a collar on the left, finned edges, a flat end and a split along its axis', () => {
+    const { outline, strokes } = drawHardwareIcon('wallPlug');
+
+    const [contour, ...others] = contoursOf(outline);
+    assert.equal(others.length, 0);
+    const corners = cornersOf(contour);
+    const extent = extentOf(corners);
+    assert.ok(extent.right - extent.left > 3 * (extent.bottom - extent.top), 'the wall plug is not lying');
+    const collarCorners = corners.filter(({ y }) => isAlmostEqual(y, extent.top));
+    assert.ok(Math.max(...collarCorners.map(({ x }) => x)) < extent.left + (extent.right - extent.left) / 10, 'no collar on the left');
+    assert.ok(directionChangesAlong(corners, true) > 6, 'no fins along the edges');
+    assert.equal(cornersAt(corners, extent.right).length, 2, 'the end is not flat');
+    const split = strokesOf(strokes).find(([start, end]) => isAlmostEqual(start.y, 0) && isAlmostEqual(end.y, 0));
+    assert.ok(split, 'no split along the axis');
+    assert.ok(isAlmostEqual(Math.max(split[0].x, split[1].x), extent.right), 'the split does not reach the end');
   });
 
   it('should draw a nut seen from the front as a hexagon with a hollow round hole, without strokes', () => {
