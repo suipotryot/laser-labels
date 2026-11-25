@@ -54,7 +54,7 @@ test.describe('generate button', () => {
     const preview = page.locator('#preview svg');
     await expect(preview).toHaveAttribute('width', '60mm');
     await expect(preview).toHaveAttribute('height', '20mm');
-    expect(await textLinesOf(page)).toEqual(['Vis', '3,5x50', 'PZ2']);
+    expect(await textLinesOf(page)).toEqual(['3,5x50', 'PZ2']);
   });
 
   test('should explain an invalid width instead of previewing', async ({ page }) => {
@@ -110,17 +110,17 @@ test.describe('generate button', () => {
     }
   });
 
-  test('should keep a long hardware name inside the text zone', async ({ page }) => {
+  test('should keep long dimensions inside the text zone', async ({ page }) => {
     await page.getByLabel('Largeur (mm)').fill('60');
     await page.getByLabel('Hauteur (mm)').fill('20');
     await page.getByLabel('Type de quincaillerie').selectOption({ label: 'Cheville Molly' });
-    await page.getByLabel('Dimensions de la pièce').fill('6x52');
+    await page.getByLabel('Dimensions de la pièce').fill('M5 x 52 tête fraisée inox A2');
 
     await generate(page);
 
     const { textZone } = computeLayout({ width: 60, height: 20 });
     const textBoxes = await textBoxesOf(page);
-    expect(textBoxes).toHaveLength(2);
+    expect(textBoxes).toHaveLength(1);
     for (const textBox of textBoxes) {
       expect(isInsideZone(textBox, textZone)).toBe(true);
     }
@@ -130,11 +130,11 @@ test.describe('generate button', () => {
     await page.getByLabel('Largeur (mm)').fill('20');
     await page.getByLabel('Hauteur (mm)').fill('10');
     await page.getByLabel('Type de quincaillerie').selectOption({ label: 'Cheville Molly' });
-    await page.getByLabel('Dimensions de la pièce').fill('6x52');
+    await page.getByLabel('Dimensions de la pièce').fill('M5 x 52 tête fraisée');
 
     await generate(page);
 
-    expect(await textLinesOf(page)).toEqual(['Cheville Molly', '6x52']);
+    expect(await textLinesOf(page)).toEqual(['M5 x 52 tête fraisée']);
     await expect(page.getByText('Le texte est très petit : il risque d\'être illisible une fois gravé.')).toBeVisible();
   });
 
@@ -177,7 +177,7 @@ test.describe('hardware type select', () => {
 
     await generate(page);
 
-    expect(await textLinesOf(page)).toEqual(['Écrou', 'M6']);
+    expect(await textLinesOf(page)).toEqual(['M6']);
   });
 
   test('should show the drive fields again when coming back to a screw', async ({ page }) => {
@@ -212,7 +212,7 @@ test.describe('drive type select', () => {
 
     await generate(page);
 
-    expect(await textLinesOf(page)).toEqual(['Vis', '3,5x50']);
+    expect(await textLinesOf(page)).toEqual(['3,5x50']);
   });
 });
 

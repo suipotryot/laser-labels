@@ -15,13 +15,19 @@ const screwSpec = {
 };
 
 describe('isTextTooSmallToRead', () => {
-  it('should find the text of a long name on a small label too small to read', () => {
-    const smallMollySpec = { ...screwSpec, width: 20, height: 10, hardwareType: 'mollyAnchor', drive: null, dimensions: '6x52' };
+  it('should find long dimensions on a small label too small to read', () => {
+    const smallLabelSpec = { ...screwSpec, width: 20, height: 10, drive: null, dimensions: 'M5 x 52 tête fraisée' };
 
-    assert.equal(isTextTooSmallToRead(smallMollySpec, font), true);
+    assert.equal(isTextTooSmallToRead(smallLabelSpec, font), true);
   });
 
   it('should find the text of a screw label of usual size readable', () => {
     assert.equal(isTextTooSmallToRead(screwSpec, font), false);
+  });
+
+  it('should have nothing to complain about on a label without text', () => {
+    const textlessSpec = { ...screwSpec, hardwareType: 'nut', drive: null, dimensions: '' };
+
+    assert.equal(isTextTooSmallToRead(textlessSpec, font), false);
   });
 });

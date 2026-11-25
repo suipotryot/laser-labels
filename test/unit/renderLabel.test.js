@@ -84,34 +84,40 @@ describe('renderLabel', () => {
     assert.equal(svg.getElementsByTagName('rect').length, 0);
   });
 
-  it('should write the hardware name, the dimensions and the drive size as text lines', () => {
+  it('should write the dimensions and the drive size as text lines, leaving the hardware type to the icon', () => {
     const svg = parseSvg(renderLabel(screwSpec, font));
 
-    assert.deepEqual(textLinesOf(svg), ['Vis', '3,5x50', 'PZ2']);
+    assert.deepEqual(textLinesOf(svg), ['3,5x50', 'PZ2']);
   });
 
   it('should leave out the drive line when there is no drive', () => {
     const svg = parseSvg(renderLabel({ ...screwSpec, hardwareType: 'nut', drive: null, dimensions: 'M6' }, font));
 
-    assert.deepEqual(textLinesOf(svg), ['Écrou', 'M6']);
+    assert.deepEqual(textLinesOf(svg), ['M6']);
   });
 
   it('should leave out the dimensions line when no dimensions are given', () => {
     const svg = parseSvg(renderLabel({ ...screwSpec, dimensions: '' }, font));
 
-    assert.deepEqual(textLinesOf(svg), ['Vis', 'PZ2']);
+    assert.deepEqual(textLinesOf(svg), ['PZ2']);
+  });
+
+  it('should write no text at all when there are neither dimensions nor drive', () => {
+    const svg = parseSvg(renderLabel({ ...screwSpec, hardwareType: 'nut', drive: null, dimensions: '' }, font));
+
+    assert.deepEqual(textLinesOf(svg), []);
   });
 
   it('should escape XML special characters typed in the dimensions', () => {
     const svg = parseSvg(renderLabel({ ...screwSpec, dimensions: '<5 & >3' }, font));
 
-    assert.deepEqual(textLinesOf(svg), ['Vis', '<5 & >3', 'PZ2']);
+    assert.deepEqual(textLinesOf(svg), ['<5 & >3', 'PZ2']);
   });
 
   it('should escape a double quote typed in the dimensions', () => {
     const svg = parseSvg(renderLabel({ ...screwSpec, dimensions: '1/4"' }, font));
 
-    assert.deepEqual(textLinesOf(svg), ['Vis', '1/4"', 'PZ2']);
+    assert.deepEqual(textLinesOf(svg), ['1/4"', 'PZ2']);
   });
 
   it('should draw the text as outlines rather than text elements', () => {
