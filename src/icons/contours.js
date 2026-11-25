@@ -1,13 +1,13 @@
 const CIRCLE_ARC_HANDLE_RATIO = 0.5523;
 const PARALLEL_TOLERANCE = 1e-9;
 
-function polygon(corners) {
-  const [first, ...others] = corners;
-  return [
-    { type: 'M', x: first.x, y: first.y },
-    ...others.map(({ x, y }) => ({ type: 'L', x, y })),
-    { type: 'Z' },
-  ];
+export function polyline(points) {
+  const [first, ...others] = points;
+  return [{ type: 'M', x: first.x, y: first.y }, ...others.map(({ x, y }) => ({ type: 'L', x, y }))];
+}
+
+export function polygon(corners) {
+  return [...polyline(corners), { type: 'Z' }];
 }
 
 export function rectangle({ halfWidth, halfHeight }) {
@@ -134,6 +134,11 @@ export function circle(radius) {
     { type: 'C', x1: handle, y1: -radius, x2: radius, y2: -handle, x: radius, y: 0 },
     { type: 'Z' },
   ];
+}
+
+export function threeQuarterArc(radius) {
+  const [move, ...quarters] = circle(radius);
+  return [move, ...quarters.slice(0, 3)];
 }
 
 const COORDINATE_PAIRS = [['x', 'y'], ['x1', 'y1'], ['x2', 'y2']];
