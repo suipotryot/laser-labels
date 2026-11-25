@@ -4,7 +4,7 @@ import { aspectRatioOfHardwareIcon, drawHardwareIcon, isHardwareDrawingPending, 
 import { hardwareTypes } from '../../src/catalog/hardwareTypes.js';
 import { contoursOf, cornersOf, extentOf, isAlmostEqual, onCurvePointsOf, windingOf } from './helpers/geometry.js';
 
-const DRAWN_HARDWARE = ['screw', 'nail', 'bolt', 'nut'];
+const DRAWN_HARDWARE = ['screw', 'nail', 'bolt', 'nut', 'eyeScrew'];
 
 function cornersAt(corners, x) {
   return corners.filter((corner) => isAlmostEqual(corner.x, x));
@@ -177,6 +177,25 @@ describe('drawHardwareIcon', () => {
     assert.ok(threads.every(([start, end]) => Math.abs(start.y) > shankRadius && Math.abs(end.y) > shankRadius), 'threads do not cross the edges');
     assert.ok(Math.min(...threads.map(([start]) => start.x)) < headEnd + length / 10, 'threads do not start near the head');
     assert.ok(Math.max(...threads.map(([start]) => start.x)) > extent.right - length / 10, 'threads do not reach the end');
+  });
+
+  it('should draw an eye screw lying with a round eye on the left, joined to a pointed shank with diagonal threads', () => {
+    const { outline, strokes } = drawHardwareIcon('eyeScrew');
+
+    const [body, hole, ...others] = contoursOf(outline);
+    assert.equal(others.length, 0);
+    assert.notEqual(windingOf(hole), windingOf(body), 'the eye would be filled');
+    const points = onCurvePointsOf(body);
+    const extent = extentOf(points);
+    assert.ok(extent.right - extent.left > 3 * (extent.bottom - extent.top), 'the eye screw is not lying');
+    assert.ok(body.some(({ type }) => type === 'C'), 'the eye is not round');
+    const tip = cornersAt(points, extent.right);
+    assert.equal(tip.length, 1);
+    assert.ok(isAlmostEqual(tip[0].y, 0), 'the tip is not on the axis');
+    const holeExtent = extentOf(onCurvePointsOf(hole));
+    assert.ok(holeExtent.right < extent.left + (extent.right - extent.left) / 3, 'the eye is not on the left');
+    const threads = strokesOf(strokes).filter(([start, end]) => !isAlmostEqual(start.x, end.x));
+    assert.ok(threads.length > 5, 'no diagonal threads');
   });
 
   it('should draw a nut seen from the front as a hexagon with a hollow round hole, without strokes', () => {

@@ -1,4 +1,15 @@
-import { aspectRatioOf, circle, hollow, placeTogetherInBox, polygonWithRoundedCorners, polyline, regularPolygon, solid } from './contours.js';
+import {
+  arc,
+  aspectRatioOf,
+  circle,
+  hollow,
+  placeInCircle,
+  placeTogetherInBox,
+  polygonWithRoundedCorners,
+  polyline,
+  regularPolygon,
+  solid,
+} from './contours.js';
 
 const FLOATING_POINT_TOLERANCE = 1e-9;
 const SCREW = {
@@ -33,6 +44,17 @@ const BOLT = {
   length: 3.6,
 };
 const NUT = { hexRadius: 1, holeRadius: 0.45 };
+const EYE_SCREW = {
+  eyeCenter: { x: 0.5, y: 0 },
+  eyeRadius: 0.5,
+  eyeHoleRadius: 0.3,
+  shankRadius: 0.12,
+  threadOverhang: 0.05,
+  threadStart: 1.4,
+  threadPitch: 0.16,
+  shankEnd: 3.3,
+  tipEnd: 3.7,
+};
 const TOP = -1;
 const BOTTOM = 1;
 
@@ -65,19 +87,19 @@ function screwEdge(side) {
   ];
 }
 
-function diagonalThreadStrokes() {
-  const lastThreadStart = SCREW.shankEnd - SCREW.threadPitch / 2;
-  return evenlySpacedPositions({ from: SCREW.threadStart, to: lastThreadStart, pitch: SCREW.threadPitch })
+function diagonalThreadStrokes(piece) {
+  const lastThreadStart = piece.shankEnd - piece.threadPitch / 2;
+  return evenlySpacedPositions({ from: piece.threadStart, to: lastThreadStart, pitch: piece.threadPitch })
     .flatMap((x) => polyline([
-      atSide(x, threadReachOf(SCREW), TOP),
-      atSide(x + SCREW.threadPitch / 2, threadReachOf(SCREW), BOTTOM),
+      atSide(x, threadReachOf(piece), TOP),
+      atSide(x + piece.threadPitch / 2, threadReachOf(piece), BOTTOM),
     ]));
 }
 
 function drawScrew() {
   return {
     outline: mirroredOutline(screwEdge, { x: SCREW.tipEnd, y: 0 }),
-    strokes: [...verticalStroke(SCREW.headDepth, SCREW.shankRadius), ...diagonalThreadStrokes()],
+    strokes: [...verticalStroke(SCREW.headDepth, SCREW.shankRadius), ...diagonalThreadStrokes(SCREW)],
   };
 }
 
@@ -155,19 +177,46 @@ function drawNut() {
   };
 }
 
-function gapBetweenDiagonalThreads() {
-  const threadRise = 2 * threadReachOf(SCREW);
-  return (SCREW.threadPitch * threadRise) / Math.hypot(SCREW.threadPitch / 2, threadRise);
+function eyeScrewBody() {
+  const eye = { center: EYE_SCREW.eyeCenter, radius: EYE_SCREW.eyeRadius };
+  const junctionAngle = Math.asin(EYE_SCREW.shankRadius / EYE_SCREW.eyeRadius);
+  const topJunctionX = EYE_SCREW.eyeCenter.x + EYE_SCREW.eyeRadius * Math.cos(junctionAngle);
+  return [
+    { type: 'M', ...atSide(topJunctionX, EYE_SCREW.shankRadius, TOP) },
+    { type: 'L', ...atSide(EYE_SCREW.shankEnd, EYE_SCREW.shankRadius, TOP) },
+    { type: 'L', x: EYE_SCREW.tipEnd, y: 0 },
+    { type: 'L', ...atSide(EYE_SCREW.shankEnd, EYE_SCREW.shankRadius, BOTTOM) },
+    { type: 'L', ...atSide(topJunctionX, EYE_SCREW.shankRadius, BOTTOM) },
+    ...arc({ ...eye, fromAngle: 2 * Math.PI - junctionAngle, toAngle: junctionAngle }),
+    { type: 'Z' },
+  ];
+}
+
+function drawEyeScrew() {
+  const eyeHole = placeInCircle(circle(1), { ...EYE_SCREW.eyeCenter, radius: EYE_SCREW.eyeHoleRadius });
+  return {
+    outline: [...solid(eyeScrewBody()), ...hollow(eyeHole)],
+    strokes: diagonalThreadStrokes(EYE_SCREW),
+  };
+}
+
+function gapBetweenDiagonalThreads(piece) {
+  const threadRise = 2 * threadReachOf(piece);
+  return (piece.threadPitch * threadRise) / Math.hypot(piece.threadPitch / 2, threadRise);
 }
 
 const HARDWARE_DRAWINGS = {
-  screw: { draw: drawScrew, thinnestDetail: Math.min(gapBetweenDiagonalThreads(), 2 * SCREW.shankRadius) },
+  screw: { draw: drawScrew, thinnestDetail: Math.min(gapBetweenDiagonalThreads(SCREW), 2 * SCREW.shankRadius) },
+  eyeScrew: {
+    draw: drawEyeScrew,
+    thinnestDetail: Math.min(gapBetweenDiagonalThreads(EYE_SCREW), EYE_SCREW.eyeRadius - EYE_SCREW.eyeHoleRadius),
+  },
   nail: { draw: drawNail, thinnestDetail: NAIL.headDepth },
   bolt: { draw: drawBolt, thinnestDetail: BOLT.chamfer },
   nut: { draw: drawNut, thinnestDetail: NUT.hexRadius * Math.cos(Math.PI / 6) - NUT.holeRadius },
 };
 
-const HARDWARE_WAITING_FOR_A_DRAWING = ['hook', 'eyeScrew', 'wallPlug', 'mollyAnchor'];
+const HARDWARE_WAITING_FOR_A_DRAWING = ['hook', 'wallPlug', 'mollyAnchor'];
 
 export function isHardwareDrawingPending(hardwareTypeKey) {
   return HARDWARE_WAITING_FOR_A_DRAWING.includes(hardwareTypeKey);

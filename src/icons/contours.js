@@ -1,5 +1,6 @@
 const CIRCLE_ARC_HANDLE_RATIO = 0.5523;
 const PARALLEL_TOLERANCE = 1e-9;
+const FLOATING_POINT_TOLERANCE = 1e-9;
 
 export function polyline(points) {
   const [first, ...others] = points;
@@ -141,6 +142,50 @@ export function roundedStar({ lobeCount, outerRadius, innerRadius }) {
 export function reachOfRoundedStar({ lobeCount, outerRadius, innerRadius }) {
   const midpointBesideLobeTip = (innerRadius * Math.cos(Math.PI / lobeCount) + outerRadius) / 2;
   return (midpointBesideLobeTip + outerRadius) / 2;
+}
+
+function pointOnCircle({ center, radius }, angle) {
+  const offset = pointAtAngle(radius, angle);
+  return { x: center.x + offset.x, y: center.y + offset.y };
+}
+
+function tangentAt(angle, length) {
+  return { x: -Math.sin(angle) * length, y: -Math.cos(angle) * length };
+}
+
+function quarterOrLessOfArc(circleOnScreen, fromAngle, toAngle) {
+  const sweep = toAngle - fromAngle;
+  const handle = (4 / 3) * Math.tan(sweep / 4) * circleOnScreen.radius;
+  const start = pointOnCircle(circleOnScreen, fromAngle);
+  const end = pointOnCircle(circleOnScreen, toAngle);
+  const startTangent = tangentAt(fromAngle, handle);
+  const endTangent = tangentAt(toAngle, handle);
+  return {
+    type: 'C',
+    x1: start.x + startTangent.x,
+    y1: start.y + startTangent.y,
+    x2: end.x - endTangent.x,
+    y2: end.y - endTangent.y,
+    x: end.x,
+    y: end.y,
+  };
+}
+
+const QUARTER_TURN = Math.PI / 2;
+
+function quarterTurnsBetween(fromAngle, toAngle) {
+  const direction = Math.sign(toAngle - fromAngle);
+  const firstQuarter = direction > 0 ? Math.floor(fromAngle / QUARTER_TURN) + 1 : Math.ceil(fromAngle / QUARTER_TURN) - 1;
+  const quarters = [];
+  for (let quarter = firstQuarter; direction * (toAngle - quarter * QUARTER_TURN) > FLOATING_POINT_TOLERANCE; quarter += direction) {
+    quarters.push(quarter * QUARTER_TURN);
+  }
+  return quarters;
+}
+
+export function arc({ center, radius, fromAngle, toAngle }) {
+  const angles = [fromAngle, ...quarterTurnsBetween(fromAngle, toAngle), toAngle];
+  return angles.slice(1).map((angle, index) => quarterOrLessOfArc({ center, radius }, angles[index], angle));
 }
 
 export function circle(radius) {

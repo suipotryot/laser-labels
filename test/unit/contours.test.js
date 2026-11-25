@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { circle, hollow, placeTogetherInBox, polyline, rectangle, solid, starOfArms } from '../../src/icons/contours.js';
+import { arc, circle, hollow, placeTogetherInBox, polyline, rectangle, solid, starOfArms } from '../../src/icons/contours.js';
 import { extentOf, isAlmostEqual, windingOf } from './helpers/geometry.js';
 
 describe('hollow', () => {
@@ -67,5 +67,30 @@ describe('placeTogetherInBox', () => {
     const singlePoint = [{ type: 'M', x: 1, y: 1 }];
 
     assert.throws(() => placeTogetherInBox([singlePoint], { x: 0, y: 0, width: 10, height: 10 }), /Cannot place a drawing without extent/);
+  });
+});
+
+function pointOnCubicCurve(start, { x1, y1, x2, y2, x, y }, progress) {
+  const remaining = 1 - progress;
+  return {
+    x: remaining ** 3 * start.x + 3 * remaining ** 2 * progress * x1 + 3 * remaining * progress ** 2 * x2 + progress ** 3 * x,
+    y: remaining ** 3 * start.y + 3 * remaining ** 2 * progress * y1 + 3 * remaining * progress ** 2 * y2 + progress ** 3 * y,
+  };
+}
+
+describe('arc', () => {
+  it('should follow the circle from one angle to the other, on screen counterclockwise', () => {
+    const center = { x: 1, y: 2 };
+    const segments = arc({ center, radius: 3, fromAngle: 0, toAngle: Math.PI * 1.5 });
+
+    let start = { x: 4, y: 2 };
+    for (const segment of segments) {
+      for (const progress of [0.25, 0.5, 0.75, 1]) {
+        const point = pointOnCubicCurve(start, segment, progress);
+        assert.ok(Math.abs(Math.hypot(point.x - center.x, point.y - center.y) - 3) < 0.01, 'the arc leaves the circle');
+      }
+      start = segment;
+    }
+    assert.ok(isAlmostEqual(start.x, 1) && isAlmostEqual(start.y, 5), 'the arc does not end at the last angle');
   });
 });
