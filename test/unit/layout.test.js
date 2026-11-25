@@ -44,11 +44,4 @@ describe('computeLayout', () => {
     assert.ok(textZone.width > iconZone.width);
   });
 
-  it('should give the whole inner zone to the text when there is no drawing', () => {
-    const withoutDrawing = computeLayout({ width: 60, height: 20 }, 'sideBySide', null);
-    const withDrawing = computeLayout({ width: 60, height: 20 }, 'sideBySide', LYING_SCREW_ASPECT_RATIO);
-
-    assert.equal(withoutDrawing.iconZone, null);
-    assert.equal(withoutDrawing.textZone.x, withDrawing.iconZone.x);
-  });
 });

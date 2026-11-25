@@ -186,12 +186,6 @@ describe('renderLabel', () => {
     assert.equal(pathsWithAttribute(svg, 'data-hardware-strokes').length, 0);
   });
 
-  it('should draw no silhouette for a hardware type that has no drawing yet', () => {
-    const svg = parseSvg(renderLabel({ ...screwSpec, hardwareType: 'hook', drive: null }, font));
-
-    assert.equal(pathsWithAttribute(svg, 'data-hardware-outline').length, 0);
-  });
-
   it('should draw no drive icon when there is no drive', () => {
     const svg = parseSvg(renderLabel({ ...screwSpec, drive: null }, font));
 
