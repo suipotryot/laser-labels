@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { drawDriveIcon } from '../../src/icons/driveIcons.js';
+import { drawDriveIcon, thinnestDetailOf } from '../../src/icons/driveIcons.js';
 import { driveTypes } from '../../src/catalog/driveTypes.js';
 
 const FLOATING_POINT_TOLERANCE = 1e-9;
@@ -208,5 +208,20 @@ describe('drawDriveIcon', () => {
     assert.deepEqual(star, recessOf('torx')[0]);
     assert.ok(onCurvePointsOf(pin).every((point) => distanceFromCenter(point) < PIN_MAXIMUM_RADIUS), 'pin is not central');
     assert.equal(others.length, 0);
+  });
+});
+
+describe('thinnestDetailOf', () => {
+  it('should give the width of the thin diagonal arms of a Pozidriv drive, relative to the head radius', () => {
+    const diagonalArmTip = armTipsOf(cornersOf(recessOf('pozidriv')[0])).reduce((thinnest, tip) => (tip.width < thinnest.width ? tip : thinnest));
+
+    assert.ok(isAlmostEqual(thinnestDetailOf('pozidriv'), diagonalArmTip.width));
+  });
+
+  it('should give a thinnest detail smaller than the head for every drive type of the catalog', () => {
+    for (const { key } of driveTypes) {
+      const thinnestDetail = thinnestDetailOf(key);
+      assert.ok(thinnestDetail > 0 && thinnestDetail < 1, `${key} has a thinnest detail of ${thinnestDetail}`);
+    }
   });
 });

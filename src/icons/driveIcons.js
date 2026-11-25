@@ -27,24 +27,53 @@ function drawPozidrivRecess() {
   return starOfArms(arms.map((arm, index) => ({ ...arm, angle: evenlySpacedAngle(index, arms.length) })));
 }
 
-const RECESS_DRAWINGS = {
-  phillips: () => hollow(taperedCross(PHILLIPS_CROSS)),
-  pozidriv: () => hollow(drawPozidrivRecess()),
-  torx: () => hollow(roundedStar(TORX_STAR)),
-  torxTamperResistant: () => [...hollow(roundedStar(TORX_STAR)), ...solid(circle(TORX_PIN_RADIUS))],
-  hexSocket: () => hollow(regularPolygon(HEXAGON)),
-  slotted: () => hollow(rectangle(SLOT)),
-  square: () => hollow(rectangle(SQUARE)),
+const DRIVE_ICONS = {
+  phillips: {
+    drawRecess: () => hollow(taperedCross(PHILLIPS_CROSS)),
+    thinnestDetail: 2 * PHILLIPS_CROSS.tipHalfWidth,
+  },
+  pozidriv: {
+    drawRecess: () => hollow(drawPozidrivRecess()),
+    thinnestDetail: 2 * POZIDRIV_DIAGONAL_ARM.halfWidth,
+  },
+  torx: {
+    drawRecess: () => hollow(roundedStar(TORX_STAR)),
+    thinnestDetail: UNIT_HEAD_RADIUS - TORX_STAR.outerRadius,
+  },
+  torxTamperResistant: {
+    drawRecess: () => [...hollow(roundedStar(TORX_STAR)), ...solid(circle(TORX_PIN_RADIUS))],
+    thinnestDetail: Math.min(UNIT_HEAD_RADIUS - TORX_STAR.outerRadius, 2 * TORX_PIN_RADIUS),
+  },
+  hexSocket: {
+    drawRecess: () => hollow(regularPolygon(HEXAGON)),
+    thinnestDetail: UNIT_HEAD_RADIUS - HEXAGON.radius,
+  },
+  slotted: {
+    drawRecess: () => hollow(rectangle(SLOT)),
+    thinnestDetail: 2 * SLOT.halfHeight,
+  },
+  square: {
+    drawRecess: () => hollow(rectangle(SQUARE)),
+    thinnestDetail: UNIT_HEAD_RADIUS - Math.hypot(SQUARE.halfWidth, SQUARE.halfHeight),
+  },
 };
 
-export function drawDriveIcon(driveTypeKey) {
-  const drawRecess = RECESS_DRAWINGS[driveTypeKey];
-  if (!drawRecess) {
+function driveIconOf(driveTypeKey) {
+  const driveIcon = DRIVE_ICONS[driveTypeKey];
+  if (!driveIcon) {
     throw new Error(`No icon for drive type: ${driveTypeKey}`);
   }
-  return [...solid(circle(UNIT_HEAD_RADIUS)), ...drawRecess()];
+  return driveIcon;
+}
+
+export function drawDriveIcon(driveTypeKey) {
+  return [...solid(circle(UNIT_HEAD_RADIUS)), ...driveIconOf(driveTypeKey).drawRecess()];
 }
 
 export function drawDriveIconInCircle(driveTypeKey, targetCircle) {
   return placeInCircle(drawDriveIcon(driveTypeKey), targetCircle);
+}
+
+export function thinnestDetailOf(driveTypeKey) {
+  return driveIconOf(driveTypeKey).thinnestDetail;
 }

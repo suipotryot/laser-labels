@@ -3,13 +3,13 @@ import { driveTypes, findDriveType, NO_DRIVE } from './catalog/driveTypes.js';
 import { readLabelSpec, LabelSpecError } from './label/labelSpec.js';
 import { describeLabelSpecError } from './label/errorMessages.js';
 import { renderLabel } from './label/renderLabel.js';
-import { isTextTooSmallToRead } from './label/textReadability.js';
+import { isLabelTooSmallToRead } from './label/labelReadability.js';
 import { buildFileName } from './label/fileName.js';
 import { downloadSvg } from './download.js';
 import { loadEngravingFont } from './text/loadEngravingFont.js';
 
 const OUTDATED_PREVIEW_NOTICE = "Le formulaire a changé : cliquez sur Générer pour mettre à jour l'aperçu.";
-const SMALL_TEXT_NOTICE = "Le texte est très petit : il risque d'être illisible une fois gravé.";
+const SMALL_DETAILS_NOTICE = "Certains détails sont très petits : ils risquent d'être illisibles une fois gravés.";
 const FONT_LOADING_FAILURE_NOTICE = "La police de gravure n'a pas pu être chargée : rechargez la page.";
 
 const form = document.getElementById('label-form');
@@ -106,16 +106,16 @@ function showPreview(svg) {
   downloadButton.disabled = false;
 }
 
-function warnIfTextIsTooSmall(spec) {
-  if (isTextTooSmallToRead(spec, engravingFont)) {
-    previewStatus.textContent = SMALL_TEXT_NOTICE;
+function warnIfLabelIsTooSmall(spec) {
+  if (isLabelTooSmallToRead(spec, engravingFont)) {
+    previewStatus.textContent = SMALL_DETAILS_NOTICE;
   }
 }
 
 function rememberAndShowLabel(spec) {
   generatedLabel = { svg: renderLabel(spec, engravingFont), fileName: buildFileName(spec) };
   showPreview(generatedLabel.svg);
-  warnIfTextIsTooSmall(spec);
+  warnIfLabelIsTooSmall(spec);
 }
 
 function explainInvalidField(error) {

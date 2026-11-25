@@ -3,6 +3,7 @@ import { test, expect } from '@playwright/test';
 import { computeLayout } from '../../src/label/layout.js';
 
 const FONT_LOADING_FAILURE_NOTICE = "La police de gravure n'a pas pu être chargée : rechargez la page.";
+const SMALL_DETAILS_NOTICE = "Certains détails sont très petits : ils risquent d'être illisibles une fois gravés.";
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/');
@@ -149,7 +150,19 @@ test.describe('generate button', () => {
     await generate(page);
 
     expect(await textLinesOf(page)).toEqual(['M5 x 52 tête fraisée']);
-    await expect(page.getByText('Le texte est très petit : il risque d\'être illisible une fois gravé.')).toBeVisible();
+    await expect(page.getByText(SMALL_DETAILS_NOTICE)).toBeVisible();
+  });
+
+  test('should still preview a label whose drive icon is too detailed to engrave, with a notice', async ({ page }) => {
+    await fillScrewLabel(page);
+    await page.getByLabel('Largeur (mm)').fill('25');
+    await page.getByLabel('Hauteur (mm)').fill('8');
+    await page.getByLabel('Dimensions de la pièce').fill('3x16');
+
+    await generate(page);
+
+    await expect(page.locator('#preview svg path[data-drive-icon]')).toHaveCount(1);
+    await expect(page.getByText(SMALL_DETAILS_NOTICE)).toBeVisible();
   });
 
   test('should stay disabled and explain why when the font fails to load', async ({ page }) => {
