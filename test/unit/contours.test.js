@@ -33,7 +33,7 @@ describe('placeTogetherInBox', () => {
     const lyingDrawing = rectangle({ halfWidth: 2, halfHeight: 0.5 });
     const box = { x: 10, y: 20, width: 8, height: 6 };
 
-    const { placedDrawings: [placed] } = placeTogetherInBox([lyingDrawing], box, { upright: false });
+    const { placedDrawings: [placed] } = placeTogetherInBox([lyingDrawing], box);
 
     const extent = extentOf(placed);
     const drawingAspectRatio = 4;
@@ -42,24 +42,12 @@ describe('placeTogetherInBox', () => {
     assert.ok(isAlmostEqual((extent.top + extent.bottom) / 2, box.y + box.height / 2));
   });
 
-  it('should turn the drawings upright, their left end on top, when asked', () => {
-    const leftEndMarker = polyline([{ x: -2, y: 0 }, { x: -1.9, y: 0 }]);
-    const lyingDrawing = rectangle({ halfWidth: 2, halfHeight: 0.5 });
-    const box = { x: 0, y: 0, width: 6, height: 20 };
-
-    const { placedDrawings: [placedMarker, placedDrawing] } = placeTogetherInBox([leftEndMarker, lyingDrawing], box, { upright: true });
-
-    const extent = extentOf(placedDrawing);
-    assert.ok(extent.bottom - extent.top > 3 * (extent.right - extent.left), 'the drawing is not upright');
-    assert.ok(isAlmostEqual(placedMarker[0].y, extent.top), 'the left end is not on top');
-  });
-
   it('should give the same scale to all the drawings and tell it', () => {
     const outline = rectangle({ halfWidth: 2, halfHeight: 0.5 });
     const strokes = polyline([{ x: -1, y: -0.5 }, { x: -1, y: 0.5 }]);
     const box = { x: 0, y: 0, width: 8, height: 6 };
 
-    const { placedDrawings: [, placedStrokes], scale } = placeTogetherInBox([outline, strokes], box, { upright: false });
+    const { placedDrawings: [, placedStrokes], scale } = placeTogetherInBox([outline, strokes], box);
 
     assert.equal(scale, 2);
     assert.ok(isAlmostEqual(placedStrokes[1].y - placedStrokes[0].y, 1 * scale));
@@ -69,7 +57,7 @@ describe('placeTogetherInBox', () => {
     const bulgingDrawing = [{ type: 'M', x: 0, y: 0 }, { type: 'Q', x1: 1, y1: -2, x: 2, y: 0 }, { type: 'L', x: 2, y: 1 }, { type: 'Z' }];
     const box = { x: 0, y: 0, width: 10, height: 10 };
 
-    const { placedDrawings: [[start, curve]] } = placeTogetherInBox([bulgingDrawing], box, { upright: false });
+    const { placedDrawings: [[start, curve]] } = placeTogetherInBox([bulgingDrawing], box);
 
     const middleOfCurveY = 0.25 * start.y + 0.5 * curve.y1 + 0.25 * curve.y;
     assert.ok(middleOfCurveY >= box.y, `the curve bulges out of the box, up to y=${middleOfCurveY}`);
@@ -78,6 +66,6 @@ describe('placeTogetherInBox', () => {
   it('should refuse a drawing without any extent', () => {
     const singlePoint = [{ type: 'M', x: 1, y: 1 }];
 
-    assert.throws(() => placeTogetherInBox([singlePoint], { x: 0, y: 0, width: 10, height: 10 }, { upright: false }), /Cannot place a drawing without extent/);
+    assert.throws(() => placeTogetherInBox([singlePoint], { x: 0, y: 0, width: 10, height: 10 }), /Cannot place a drawing without extent/);
   });
 });

@@ -2,7 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { DOMParser } from '@xmldom/xmldom';
 import { renderLabel } from '../../src/label/renderLabel.js';
-import { computeLayout } from '../../src/label/layout.js';
+import { chooseLayout } from '../../src/label/chooseLayout.js';
 import { loadTestFont } from './helpers/loadTestFont.js';
 import { placeLabelTextLines } from '../../src/label/placeLabelTextLines.js';
 
@@ -121,7 +121,7 @@ describe('renderLabel', () => {
 
   it('should keep the drive icon inside the text zone of a narrow stacked label', () => {
     const narrowSpec = { ...screwSpec, width: 15, height: 40, drive: { type: 'torxTamperResistant', size: 'T40H' } };
-    const { textZone } = computeLayout(narrowSpec);
+    const { textZone } = chooseLayout(narrowSpec, font);
     const svg = parseSvg(renderLabel(narrowSpec, font));
 
     for (const point of driveIconPathsOf(svg).flatMap(onCurvePointsOf)) {
@@ -140,7 +140,7 @@ describe('renderLabel', () => {
   });
 
   it('should draw the hardware silhouette and its strokes inside the icon zone', () => {
-    const { iconZone } = computeLayout(screwSpec);
+    const { iconZone } = chooseLayout(screwSpec, font);
     const svg = parseSvg(renderLabel(screwSpec, font));
 
     const [silhouette] = pathsWithAttribute(svg, 'data-hardware-outline');
@@ -152,28 +152,31 @@ describe('renderLabel', () => {
     }
   });
 
-  it('should stand the silhouette upright in the icon zone of a label taller than wide', () => {
-    const stackedSpec = { ...screwSpec, width: 20, height: 60 };
-    const { iconZone } = computeLayout(stackedSpec);
-    const svg = parseSvg(renderLabel(stackedSpec, font));
+  it('should lay the silhouette across the whole width of a tall label, below the text', () => {
+    const tallSpec = { ...screwSpec, width: 20, height: 60 };
+    const { iconZone } = chooseLayout(tallSpec, font);
+    const svg = parseSvg(renderLabel(tallSpec, font));
 
     const [silhouette] = pathsWithAttribute(svg, 'data-hardware-outline');
     const [strokesPath] = pathsWithAttribute(svg, 'data-hardware-strokes');
     const { left, right } = horizontalSpanOf(silhouette);
     const { top, bottom } = verticalSpanOf(silhouette);
-    assert.ok(bottom - top > 3 * (right - left), 'the silhouette is not upright');
-    assert.ok([silhouette, strokesPath].flatMap(onCurvePointsOf).every((point) => isInsideZone(point, iconZone)), 'the silhouette leaves the icon zone');
+    assert.ok(right - left > 3 * (bottom - top), 'the silhouette is not lying');
+    assert.ok(Math.abs(right - left - iconZone.width) < 1e-3, 'the silhouette does not take the whole width');
+    assert.ok([silhouette, strokesPath].flatMap(onCurvePointsOf).every((point) => isInsideZone(point, iconZone)), 'the silhouette leaves its zone');
+    for (const point of textPathsOf(svg).flatMap(onCurvePointsOf)) {
+      assert.ok(point.y < iconZone.y, 'the text is not above the silhouette');
+    }
   });
 
-  it('should stand the silhouette upright when its icon zone is taller than wide, even on a label wider than tall', () => {
+  it('should keep the silhouette lying on a label wider than tall, whatever the shape of its icon zone', () => {
     const shortLabelSpec = { ...screwSpec, width: 30, height: 20 };
-    const { iconZone } = computeLayout(shortLabelSpec);
     const svg = parseSvg(renderLabel(shortLabelSpec, font));
 
     const [silhouette] = pathsWithAttribute(svg, 'data-hardware-outline');
+    const { left, right } = horizontalSpanOf(silhouette);
     const { top, bottom } = verticalSpanOf(silhouette);
-    assert.ok(iconZone.height > iconZone.width);
-    assert.ok(Math.abs(bottom - top - iconZone.height) < 1e-3, 'the silhouette does not use the height of its zone');
+    assert.ok(right - left > 3 * (bottom - top), 'the silhouette is not lying');
   });
 
   it('should draw no strokes path for hardware without strokes', () => {
@@ -257,21 +260,11 @@ describe('renderLabel', () => {
 
   it('should keep a long hardware name inside the text zone', () => {
     const mollySpec = { ...screwSpec, hardwareType: 'mollyAnchor', drive: null, dimensions: '6x52' };
-    const { textZone } = computeLayout(mollySpec);
+    const { textZone } = chooseLayout(mollySpec, font);
     const svg = parseSvg(renderLabel(mollySpec, font));
 
     for (const point of textPathsOf(svg).flatMap(onCurvePointsOf)) {
       assert.ok(isInsideZone(point, textZone), `(${point.x}, ${point.y}) is outside the text zone`);
-    }
-  });
-
-  it('should write the text below the icon zone of a stacked label', () => {
-    const stackedSpec = { ...screwSpec, width: 20, height: 60 };
-    const { iconZone } = computeLayout(stackedSpec);
-    const svg = parseSvg(renderLabel(stackedSpec, font));
-
-    for (const point of textPathsOf(svg).flatMap(onCurvePointsOf)) {
-      assert.ok(point.y > iconZone.y + iconZone.height);
     }
   });
 

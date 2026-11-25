@@ -41,7 +41,7 @@ function fontSizeAllowedByWidth(font, lines, zone) {
   return zone.width / widestLinePerFontSize;
 }
 
-function largestFittingFontSize(font, lines, zone) {
+export function largestFittingFontSize(font, lines, zone) {
   return Math.min(fontSizeAllowedByHeight(font, lines, zone), fontSizeAllowedByWidth(font, lines, zone));
 }
 

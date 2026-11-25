@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { drawHardwareIcon, isHardwareDrawingPending, thinnestHardwareDetail } from '../../src/icons/hardwareIcons.js';
+import { aspectRatioOfHardwareIcon, drawHardwareIcon, isHardwareDrawingPending, thinnestHardwareDetail } from '../../src/icons/hardwareIcons.js';
 import { hardwareTypes } from '../../src/catalog/hardwareTypes.js';
 import { contoursOf, cornersOf, extentOf, isAlmostEqual, windingOf } from './helpers/geometry.js';
 
@@ -154,5 +154,16 @@ describe('thinnestHardwareDetail', () => {
     const chamferEnd = Math.min(...corners.filter(({ y }) => isAlmostEqual(y, extent.top)).map(({ x }) => x));
 
     assert.ok(isAlmostEqual(thinnestHardwareDetail('bolt'), chamferEnd - extent.left));
+  });
+});
+
+describe('aspectRatioOfHardwareIcon', () => {
+  it('should give the width over the height of the lying drawing, strokes included', () => {
+    for (const key of DRAWN_HARDWARE) {
+      const { outline, strokes } = drawHardwareIcon(key);
+      const extent = extentOf([...outline, ...strokes]);
+
+      assert.ok(isAlmostEqual(aspectRatioOfHardwareIcon(key), (extent.right - extent.left) / (extent.bottom - extent.top)), key);
+    }
   });
 });

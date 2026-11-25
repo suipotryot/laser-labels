@@ -172,12 +172,12 @@ function extentOf(drawing) {
   return { left: horizontal.start, top: vertical.start, width: horizontal.size, height: vertical.size };
 }
 
-function turnedUpright(drawing) {
-  return movedDrawing(drawing, ({ x, y }) => ({ x: -y, y: x }));
+export function aspectRatioOf(drawings) {
+  const { width, height } = extentOf(drawings.flat());
+  return width / height;
 }
 
-export function placeTogetherInBox(lyingDrawings, box, { upright }) {
-  const drawings = lyingDrawings.map((drawing) => (upright ? turnedUpright(drawing) : drawing));
+export function placeTogetherInBox(drawings, box) {
   const extent = extentOf(drawings.flat());
   if (extent.width === 0 && extent.height === 0) {
     throw new Error('Cannot place a drawing without extent');

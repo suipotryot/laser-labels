@@ -1,4 +1,4 @@
-import { circle, hollow, placeTogetherInBox, polygon, polyline, regularPolygon, solid } from './contours.js';
+import { aspectRatioOf, circle, hollow, placeTogetherInBox, polygon, polyline, regularPolygon, solid } from './contours.js';
 
 const FLOATING_POINT_TOLERANCE = 1e-9;
 const SCREW = {
@@ -155,8 +155,13 @@ export function thinnestHardwareDetail(hardwareTypeKey) {
   return hardwareDrawingOf(hardwareTypeKey).thinnestDetail;
 }
 
-export function drawHardwareIconInBox(hardwareTypeKey, box, { upright }) {
+export function aspectRatioOfHardwareIcon(hardwareTypeKey) {
   const { outline, strokes } = drawHardwareIcon(hardwareTypeKey);
-  const { placedDrawings: [placedOutline, placedStrokes], scale } = placeTogetherInBox([outline, strokes], box, { upright });
+  return aspectRatioOf([outline, strokes]);
+}
+
+export function drawHardwareIconInBox(hardwareTypeKey, box) {
+  const { outline, strokes } = drawHardwareIcon(hardwareTypeKey);
+  const { placedDrawings: [placedOutline, placedStrokes], scale } = placeTogetherInBox([outline, strokes], box);
   return { outline: placedOutline, strokes: placedStrokes, scale };
 }

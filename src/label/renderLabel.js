@@ -53,14 +53,14 @@ function renderOptionalHardwareStrokes(hardwareTypeKey, strokes) {
   return strokes.length > 0 ? renderHardwareStrokes(hardwareTypeKey, strokes) : '';
 }
 
-function renderHardwareIcon(spec) {
-  const { outline, strokes } = placeHardwareIcon(spec);
+function renderHardwareIcon(spec, font) {
+  const { outline, strokes } = placeHardwareIcon(spec, font);
   const pathData = toSvgPathData(outline);
   return `<path data-hardware-outline="${escapeXml(spec.hardwareType)}" d="${pathData}"/>` + renderOptionalHardwareStrokes(spec.hardwareType, strokes);
 }
 
-function renderOptionalHardwareIcon(spec) {
-  return isHardwareDrawingPending(spec.hardwareType) ? '' : renderHardwareIcon(spec);
+function renderOptionalHardwareIcon(spec, font) {
+  return isHardwareDrawingPending(spec.hardwareType) ? '' : renderHardwareIcon(spec, font);
 }
 
 function renderSvg({ width, height }, content) {
@@ -68,5 +68,5 @@ function renderSvg({ width, height }, content) {
 }
 
 export function renderLabel(spec, font) {
-  return renderSvg(spec, renderOptionalFrame(spec) + renderOptionalHardwareIcon(spec) + renderLines(spec, font));
+  return renderSvg(spec, renderOptionalFrame(spec) + renderOptionalHardwareIcon(spec, font) + renderLines(spec, font));
 }

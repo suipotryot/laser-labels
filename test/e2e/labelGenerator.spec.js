@@ -1,6 +1,5 @@
 import { readFile } from 'node:fs/promises';
 import { test, expect } from '@playwright/test';
-import { computeLayout } from '../../src/label/layout.js';
 
 const FONT_LOADING_FAILURE_NOTICE = "La police de gravure n'a pas pu être chargée : rechargez la page.";
 const SMALL_DETAILS_NOTICE = "Certains détails sont très petits : ils risquent d'être illisibles une fois gravés.";
@@ -48,6 +47,17 @@ function isInsideZone(box, zone) {
     && box.right <= zone.x + zone.width + ROUNDING_TOLERANCE_MILLIMETERS
     && box.top >= zone.y - ROUNDING_TOLERANCE_MILLIMETERS
     && box.bottom <= zone.y + zone.height + ROUNDING_TOLERANCE_MILLIMETERS;
+}
+
+function areOverlapping(first, second) {
+  return first.left < second.right && second.left < first.right && first.top < second.bottom && second.top < first.bottom;
+}
+
+function silhouetteBoxOf(page) {
+  return previewSvgOf(page).locator('path[data-hardware-outline]').evaluate((path) => {
+    const { x, y, width, height } = path.getBBox();
+    return { left: x, top: y, right: x + width, bottom: y + height };
+  });
 }
 
 function textBoxesOf(page) {
@@ -155,35 +165,38 @@ test.describe('preview', () => {
     await expect(page.locator('#preview svg rect')).toHaveCount(1);
   });
 
-  test('should stack the text below the icon zone of a label taller than wide', async ({ page }) => {
+  test('should write the text above the lying silhouette of a label taller than wide', async ({ page }) => {
     await fillScrewLabel(page);
     await page.getByLabel('Largeur (mm)').fill('20');
     await page.getByLabel('Hauteur (mm)').fill('60');
 
-    const { iconZone } = computeLayout({ width: 20, height: 60 });
+    const silhouetteBox = await silhouetteBoxOf(page);
+    expect(silhouetteBox.right - silhouetteBox.left).toBeGreaterThan(3 * (silhouetteBox.bottom - silhouetteBox.top));
     for (const textBox of await textBoxesOf(page)) {
-      expect(textBox.top).toBeGreaterThan(iconZone.y + iconZone.height);
+      expect(textBox.bottom).toBeLessThan(silhouetteBox.top);
     }
   });
 
-  test('should keep long dimensions inside the text zone', async ({ page }) => {
-    await page.getByLabel('Largeur (mm)').fill('60');
-    await page.getByLabel('Hauteur (mm)').fill('20');
-    await page.getByLabel('Type de quincaillerie').selectOption({ label: 'Cheville Molly' });
+  test('should keep long dimensions inside the label, clear of the silhouette', async ({ page }) => {
+    await fillScrewLabel(page);
+    await page.getByLabel("Type d'empreinte").selectOption({ label: 'Aucune' });
     await page.getByLabel('Dimensions de la pièce').fill('M5 x 52 tête fraisée inox A2');
 
-    const { textZone } = computeLayout({ width: 60, height: 20 });
+    const label = { x: 0, y: 0, width: 60, height: 20 };
+    const silhouetteBox = await silhouetteBoxOf(page);
     const textBoxes = await textBoxesOf(page);
     expect(textBoxes).toHaveLength(1);
     for (const textBox of textBoxes) {
-      expect(isInsideZone(textBox, textZone)).toBe(true);
+      expect(isInsideZone(textBox, label)).toBe(true);
+      expect(areOverlapping(textBox, silhouetteBox)).toBe(false);
     }
   });
 
   test('should still draw a label whose text is too small to read, with a notice', async ({ page }) => {
-    await page.getByLabel('Largeur (mm)').fill('20');
-    await page.getByLabel('Hauteur (mm)').fill('10');
-    await page.getByLabel('Type de quincaillerie').selectOption({ label: 'Cheville Molly' });
+    await fillScrewLabel(page);
+    await page.getByLabel("Type d'empreinte").selectOption({ label: 'Aucune' });
+    await page.getByLabel('Largeur (mm)').fill('15');
+    await page.getByLabel('Hauteur (mm)').fill('8');
     await page.getByLabel('Dimensions de la pièce').fill('M5 x 52 tête fraisée');
 
     expect(await textLinesOf(page)).toEqual(['M5 x 52 tête fraisée']);

@@ -24,14 +24,14 @@ function hasLineDetailsTooSmallToEngrave(font, placedLine) {
   return isTextTooSmallToRead(font, placedLine) || hasDriveIconTooDetailedToEngrave(placedLine);
 }
 
-function hasHardwareIconTooDetailedToEngrave(spec) {
+function hasHardwareIconTooDetailedToEngrave(spec, font) {
   if (isHardwareDrawingPending(spec.hardwareType)) {
     return false;
   }
-  return thinnestHardwareDetail(spec.hardwareType) * placeHardwareIcon(spec).scale < MINIMUM_ENGRAVABLE_DETAIL_MILLIMETERS;
+  return thinnestHardwareDetail(spec.hardwareType) * placeHardwareIcon(spec, font).scale < MINIMUM_ENGRAVABLE_DETAIL_MILLIMETERS;
 }
 
 export function hasDetailsTooSmallToEngrave(spec, font) {
-  return hasHardwareIconTooDetailedToEngrave(spec)
+  return hasHardwareIconTooDetailedToEngrave(spec, font)
     || placeLabelTextLines(spec, font).some((placedLine) => hasLineDetailsTooSmallToEngrave(font, placedLine));
 }
