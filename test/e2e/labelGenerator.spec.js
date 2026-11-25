@@ -2,6 +2,8 @@ import { readFile } from 'node:fs/promises';
 import { test, expect } from '@playwright/test';
 import { computeLayout } from '../../src/label/layout.js';
 
+const FONT_LOADING_FAILURE_NOTICE = "La police de gravure n'a pas pu être chargée : rechargez la page.";
+
 test.beforeEach(async ({ page }) => {
   await page.goto('/');
 });
@@ -19,6 +21,30 @@ async function generate(page) {
   await page.getByRole('button', { name: 'Générer' }).click();
 }
 
+function textPathsOf(page) {
+  return page.locator('#preview svg path[aria-label]');
+}
+
+function textLinesOf(page) {
+  return textPathsOf(page).evaluateAll((paths) => paths.map((path) => path.getAttribute('aria-label')));
+}
+
+const ROUNDING_TOLERANCE_MILLIMETERS = 0.001;
+
+function isInsideZone(box, zone) {
+  return box.left >= zone.x - ROUNDING_TOLERANCE_MILLIMETERS
+    && box.right <= zone.x + zone.width + ROUNDING_TOLERANCE_MILLIMETERS
+    && box.top >= zone.y - ROUNDING_TOLERANCE_MILLIMETERS
+    && box.bottom <= zone.y + zone.height + ROUNDING_TOLERANCE_MILLIMETERS;
+}
+
+function textBoxesOf(page) {
+  return textPathsOf(page).evaluateAll((paths) => paths.map((path) => {
+    const { x, y, width, height } = path.getBBox();
+    return { left: x, top: y, right: x + width, bottom: y + height };
+  }));
+}
+
 test.describe('generate button', () => {
   test('should preview the label sized in millimeters with its text lines', async ({ page }) => {
     await fillScrewLabel(page);
@@ -28,7 +54,7 @@ test.describe('generate button', () => {
     const preview = page.locator('#preview svg');
     await expect(preview).toHaveAttribute('width', '60mm');
     await expect(preview).toHaveAttribute('height', '20mm');
-    await expect(preview.locator('text')).toHaveText(['Vis', '3,5x50', 'PZ2']);
+    expect(await textLinesOf(page)).toEqual(['3,5x50', 'PZ2']);
   });
 
   test('should explain an invalid width instead of previewing', async ({ page }) => {
@@ -38,6 +64,16 @@ test.describe('generate button', () => {
     await generate(page);
 
     await expect(page.getByRole('alert')).toHaveText('La largeur doit être un nombre positif (en mm).');
+    await expect(page.locator('#preview svg')).toHaveCount(0);
+  });
+
+  test('should list the characters the font cannot engrave instead of previewing', async ({ page }) => {
+    await fillScrewLabel(page);
+    await page.getByLabel('Dimensions de la pièce').fill('⌀6 j́');
+
+    await generate(page);
+
+    await expect(page.getByRole('alert')).toHaveText('Ces caractères ne peuvent pas être gravés : ⌀ ́');
     await expect(page.locator('#preview svg')).toHaveCount(0);
   });
 
@@ -69,8 +105,59 @@ test.describe('generate button', () => {
     await generate(page);
 
     const { iconZone } = computeLayout({ width: 20, height: 60 });
-    const firstLineBaseline = Number(await page.locator('#preview svg text').first().getAttribute('y'));
-    expect(firstLineBaseline).toBeGreaterThan(iconZone.y + iconZone.height);
+    for (const textBox of await textBoxesOf(page)) {
+      expect(textBox.top).toBeGreaterThan(iconZone.y + iconZone.height);
+    }
+  });
+
+  test('should keep long dimensions inside the text zone', async ({ page }) => {
+    await page.getByLabel('Largeur (mm)').fill('60');
+    await page.getByLabel('Hauteur (mm)').fill('20');
+    await page.getByLabel('Type de quincaillerie').selectOption({ label: 'Cheville Molly' });
+    await page.getByLabel('Dimensions de la pièce').fill('M5 x 52 tête fraisée inox A2');
+
+    await generate(page);
+
+    const { textZone } = computeLayout({ width: 60, height: 20 });
+    const textBoxes = await textBoxesOf(page);
+    expect(textBoxes).toHaveLength(1);
+    for (const textBox of textBoxes) {
+      expect(isInsideZone(textBox, textZone)).toBe(true);
+    }
+  });
+
+  test('should still preview a label whose text is too small to read, with a notice', async ({ page }) => {
+    await page.getByLabel('Largeur (mm)').fill('20');
+    await page.getByLabel('Hauteur (mm)').fill('10');
+    await page.getByLabel('Type de quincaillerie').selectOption({ label: 'Cheville Molly' });
+    await page.getByLabel('Dimensions de la pièce').fill('M5 x 52 tête fraisée');
+
+    await generate(page);
+
+    expect(await textLinesOf(page)).toEqual(['M5 x 52 tête fraisée']);
+    await expect(page.getByText('Le texte est très petit : il risque d\'être illisible une fois gravé.')).toBeVisible();
+  });
+
+  test('should stay disabled and explain why when the font fails to load', async ({ page }) => {
+    await page.addInitScript(() => {
+      globalThis.fetch = () => Promise.reject(new Error('Network down'));
+    });
+
+    await page.reload();
+
+    await expect(page.getByRole('alert')).toHaveText(FONT_LOADING_FAILURE_NOTICE);
+    await expect(page.getByRole('button', { name: 'Générer' })).toBeDisabled();
+  });
+
+  test('should stay disabled and explain why when the font cannot be found', async ({ page }) => {
+    await page.addInitScript(() => {
+      globalThis.fetch = () => Promise.resolve(new Response(null, { status: 404 }));
+    });
+
+    await page.reload();
+
+    await expect(page.getByRole('alert')).toHaveText(FONT_LOADING_FAILURE_NOTICE);
+    await expect(page.getByRole('button', { name: 'Générer' })).toBeDisabled();
   });
 });
 
@@ -90,7 +177,7 @@ test.describe('hardware type select', () => {
 
     await generate(page);
 
-    await expect(page.locator('#preview svg text')).toHaveText(['Écrou', 'M6']);
+    expect(await textLinesOf(page)).toEqual(['M6']);
   });
 
   test('should show the drive fields again when coming back to a screw', async ({ page }) => {
@@ -125,7 +212,7 @@ test.describe('drive type select', () => {
 
     await generate(page);
 
-    await expect(page.locator('#preview svg text')).toHaveText(['Vis', '3,5x50']);
+    expect(await textLinesOf(page)).toEqual(['3,5x50']);
   });
 });
 
@@ -150,7 +237,8 @@ test.describe('download button', () => {
     expect(download.suggestedFilename()).toBe('vis-3,5x50-pz2.svg');
     const downloadedSvg = await readFile(await download.path(), 'utf8');
     expect(downloadedSvg).toContain('width="60mm"');
-    expect(downloadedSvg).toContain('>3,5x50</text>');
+    expect(downloadedSvg).toContain('aria-label="3,5x50"');
+    expect(downloadedSvg).not.toContain('<text');
   });
 
   test('should be disabled again once the form changes after generation', async ({ page }) => {

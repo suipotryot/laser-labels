@@ -25,3 +25,8 @@ npm run deploy     # build + copie dans ../suipotryot.github.io/laser-labels
 - Dimensions en millimètres (`width="60mm"`, `viewBox` en mm) : la taille réelle est conservée à l'import dans LightBurn.
 - Tout est dessiné en trait (`fill="none"`, `stroke="#000"`) : le mode Line ou Fill se choisit dans le logiciel de gravure.
 - L'orientation est déduite des dimensions : plus haute que large → icône au-dessus du texte, sinon icône à gauche.
+- Le texte est converti en contours fermés (police embarquée, aucune dépendance aux polices installées) et ajusté pour tenir dans sa zone.
+
+## Police
+
+Le texte est gravé en [Barlow Semi Condensed](https://github.com/jpt/barlow) SemiBold, © 2017 The Barlow Project Authors, sous licence SIL Open Font License 1.1 (voir [src/text/fonts/OFL.txt](src/text/fonts/OFL.txt)).

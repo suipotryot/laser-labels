@@ -1,12 +1,13 @@
 import { findHardwareType } from '../catalog/hardwareTypes.js';
-import { findDriveType } from '../catalog/driveTypes.js';
+import { findDriveType, NO_DRIVE } from '../catalog/driveTypes.js';
 
 export class LabelSpecError extends Error {
-  constructor(field, reason) {
+  constructor(field, reason, details = {}) {
     super(`Invalid label field "${field}": ${reason}`);
     this.name = 'LabelSpecError';
     this.field = field;
     this.reason = reason;
+    Object.assign(this, details);
   }
 }
 
@@ -41,10 +42,7 @@ function readHardwareType(fields) {
   return hardwareType;
 }
 
-function readDrive(fields, hardwareType) {
-  if (fields.driveType === '') {
-    return null;
-  }
+function readDriveType(fields, hardwareType) {
   if (!hardwareType.hasDrive) {
     throw new LabelSpecError('driveType', 'notApplicable');
   }
@@ -52,30 +50,70 @@ function readDrive(fields, hardwareType) {
   if (!driveType) {
     throw new LabelSpecError('driveType', 'unknown');
   }
+  return driveType;
+}
+
+function readDriveSize(fields, driveType) {
   if (!driveType.sizes.includes(fields.driveSize)) {
     throw new LabelSpecError('driveSize', 'unknown');
   }
-  return { type: driveType.key, size: fields.driveSize };
+  return fields.driveSize;
 }
 
-const CONTROL_CHARACTERS = /\p{Cc}/u;
+function readDrive(fields, hardwareType) {
+  if (fields.driveType === NO_DRIVE) {
+    return null;
+  }
+  const driveType = readDriveType(fields, hardwareType);
+  return { type: driveType.key, size: readDriveSize(fields, driveType) };
+}
 
-function readDimensions(fields) {
-  const dimensions = fields.dimensions.trim();
-  if (CONTROL_CHARACTERS.test(dimensions)) {
-    throw new LabelSpecError('dimensions', 'invalidCharacters');
+const NON_PRINTABLE_CHARACTERS = /\p{C}/u;
+const STANDALONE_ACCENT = /\p{M}/u;
+
+function isEngravable(font, character) {
+  return font.hasChar(character) && !STANDALONE_ACCENT.test(character);
+}
+
+function listUnengravableCharacters(font, text) {
+  return [...new Set(text)].filter((character) => !isEngravable(font, character));
+}
+
+const ANY_KIND_OF_SPACE = /\p{Zs}/gu;
+
+function normalizeTypedText(text) {
+  return text.normalize('NFC').replace(ANY_KIND_OF_SPACE, ' ').trim();
+}
+
+const MAXIMUM_DIMENSIONS_LENGTH = 40;
+
+function exceedsDimensionsLength(text) {
+  return [...text].length > MAXIMUM_DIMENSIONS_LENGTH;
+}
+
+function readDimensions(fields, font) {
+  const dimensions = normalizeTypedText(fields.dimensions);
+  if (exceedsDimensionsLength(dimensions)) {
+    throw new LabelSpecError('dimensions', 'tooLong');
+  }
+  if (NON_PRINTABLE_CHARACTERS.test(dimensions)) {
+    throw new LabelSpecError('dimensions', 'nonPrintableCharacters');
+  }
+  const unengravableCharacters = listUnengravableCharacters(font, dimensions);
+  if (unengravableCharacters.length > 0) {
+    throw new LabelSpecError('dimensions', 'unengravableCharacters', { characters: unengravableCharacters });
   }
   return dimensions;
 }
 
-export function readLabelSpec(fields) {
+export function readLabelSpec(fields, font) {
   const hardwareType = readHardwareType(fields);
   return {
     width: readLabelSide(fields, 'width'),
     height: readLabelSide(fields, 'height'),
     hardwareType: hardwareType.key,
     drive: readDrive(fields, hardwareType),
-    dimensions: readDimensions(fields),
+    dimensions: readDimensions(fields, font),
     hasFrame: fields.hasFrame,
   };
 }
