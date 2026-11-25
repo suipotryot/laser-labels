@@ -374,6 +374,7 @@ function drawMollyAnchor() {
   return {
     outline: [...mirroredOutline(mollyAnchorEdge), ...expansionSlot(TOP), ...expansionSlot(BOTTOM)],
     strokes: [
+      ...verticalStroke(MOLLY_ANCHOR.headDepth, MOLLY_ANCHOR.headRadius),
       ...verticalStroke(MOLLY_ANCHOR.flangeEnd, MOLLY_ANCHOR.sleeveRadius),
       ...verticalStroke(MOLLY_ANCHOR.coneStart, MOLLY_ANCHOR.sleeveRadius),
       ...coneThreads(),

@@ -264,6 +264,18 @@ describe('drawHardwareIcon', () => {
     assert.ok(coneThreads.length >= 2, 'no threads on the cone');
   });
 
+  it('should draw a line across the head of the Molly anchor where it meets the flange', () => {
+    const { outline, strokes } = drawHardwareIcon('mollyAnchor');
+
+    const points = onCurvePointsOf(contoursOf(outline)[0]);
+    const extent = extentOf(points);
+    const flangeStart = Math.min(...points.filter(({ y }) => isAlmostEqual(y, extent.top)).map(({ x }) => x));
+    const headRadius = Math.max(...points.filter(({ x, y }) => y < 0 && x < flangeStart).map(({ y }) => -y));
+    const lineAtFlange = strokesOf(strokes).find(([start, end]) => isAlmostEqual(start.x, flangeStart) && isAlmostEqual(end.x, flangeStart));
+    assert.ok(lineAtFlange, 'no line between the head and the flange');
+    assert.ok(isAlmostEqual(Math.abs(lineAtFlange[1].y - lineAtFlange[0].y), 2 * headRadius), 'the line does not span exactly the head');
+  });
+
   it('should draw a nut seen from the front as a hexagon with a hollow round hole, without strokes', () => {
     const { outline, strokes } = drawHardwareIcon('nut');
 
