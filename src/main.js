@@ -5,8 +5,10 @@ import { describeLabelSpecError } from './label/errorMessages.js';
 import { renderLabel } from './label/renderLabel.js';
 import { buildFileName } from './label/fileName.js';
 import { downloadSvg } from './download.js';
+import { loadFont } from './text/loadFont.js';
 
 const OUTDATED_PREVIEW_NOTICE = "Le formulaire a changé : cliquez sur Générer pour mettre à jour l'aperçu.";
+const FONT_LOADING_FAILURE_NOTICE = "La police de gravure n'a pas pu être chargée : rechargez la page.";
 
 const form = document.getElementById('label-form');
 const widthInput = document.getElementById('width');
@@ -20,6 +22,7 @@ const driveSizeSelect = document.getElementById('drive-size');
 const errorMessage = document.getElementById('error-message');
 const previewStatus = document.getElementById('preview-status');
 const preview = document.getElementById('preview');
+const generateButton = document.getElementById('generate');
 const downloadButton = document.getElementById('download');
 
 function replaceOptions(select, options) {
@@ -74,6 +77,18 @@ function readFormFields() {
   };
 }
 
+let engravingFont = null;
+
+function enableGenerationWith(font) {
+  engravingFont = font;
+  generateButton.disabled = false;
+}
+
+function explainFontLoadingFailure(error) {
+  errorMessage.textContent = FONT_LOADING_FAILURE_NOTICE;
+  throw error;
+}
+
 let generatedLabel = null;
 
 function forgetGeneratedLabel() {
@@ -82,7 +97,7 @@ function forgetGeneratedLabel() {
 }
 
 function rememberAndShowLabel(spec) {
-  generatedLabel = { svg: renderLabel(spec), fileName: buildFileName(spec) };
+  generatedLabel = { svg: renderLabel(spec, engravingFont), fileName: buildFileName(spec) };
   errorMessage.textContent = '';
   previewStatus.textContent = '';
   preview.classList.remove('is-outdated');
@@ -138,3 +153,4 @@ driveTypeSelect.addEventListener('change', populateDriveSizes);
 form.addEventListener('submit', generateLabel);
 form.addEventListener('input', handleFormChange);
 downloadButton.addEventListener('click', downloadGeneratedLabel);
+loadFont().then(enableGenerationWith, explainFontLoadingFailure);

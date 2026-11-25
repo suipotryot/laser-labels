@@ -1,23 +1,11 @@
 import { computeLayout } from './layout.js';
 import { listLabelLines } from './listLabelLines.js';
+import { fitTextLines } from '../text/fitTextLines.js';
+import { outlineTextLine } from '../text/outlineTextLine.js';
+import { svgMarkup } from '../svg/svgMarkup.js';
 
 const STROKE_WIDTH = 0.1;
 const FRAME_CORNER_RATIO = 0.1;
-const FONT_SIZE_TO_LINE_HEIGHT_RATIO = 0.8;
-const CAP_HEIGHT_TO_FONT_SIZE_RATIO = 0.7;
-const MICROMETERS_PER_MILLIMETER = 1000;
-
-function roundToMicrometer(millimeters) {
-  return Math.round(millimeters * MICROMETERS_PER_MILLIMETER) / MICROMETERS_PER_MILLIMETER;
-}
-
-function roundIfNumber(value) {
-  return typeof value === 'number' ? roundToMicrometer(value) : value;
-}
-
-function svgMarkup(strings, ...values) {
-  return strings.reduce((markup, string, index) => markup + roundIfNumber(values[index - 1]) + string);
-}
 
 function renderFrame({ width, height }) {
   const inset = STROKE_WIDTH / 2;
@@ -29,29 +17,19 @@ function renderOptionalFrame(spec) {
   return spec.hasFrame ? renderFrame(spec) : '';
 }
 
-const XML_ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;' };
+const XML_ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' };
 
 function escapeXml(text) {
-  return text.replace(/[&<>]/g, (character) => XML_ESCAPES[character]);
+  return text.replace(/[&<>"]/g, (character) => XML_ESCAPES[character]);
 }
 
-function centeredBaseline(lineTop, lineHeight, fontSize) {
-  const capHeight = fontSize * CAP_HEIGHT_TO_FONT_SIZE_RATIO;
-  return lineTop + (lineHeight + capHeight) / 2;
+function renderTextLine(font, placedLine) {
+  return `<path aria-label="${escapeXml(placedLine.text)}" d="${outlineTextLine(font, placedLine)}"/>`;
 }
 
-function renderTextLine(line, x, baseline, fontSize) {
-  return svgMarkup`<text x="${x}" y="${baseline}" font-family="sans-serif" font-size="${fontSize}">${escapeXml(line)}</text>`;
-}
-
-function renderTextLines(lines, zone) {
-  const lineHeight = zone.height / lines.length;
-  const fontSize = lineHeight * FONT_SIZE_TO_LINE_HEIGHT_RATIO;
-  return lines
-    .map((line, index) => {
-      const lineTop = zone.y + lineHeight * index;
-      return renderTextLine(line, zone.x, centeredBaseline(lineTop, lineHeight, fontSize), fontSize);
-    })
+function renderTextLines(font, lines, zone) {
+  return fitTextLines(font, lines, zone)
+    .map((placedLine) => renderTextLine(font, placedLine))
     .join('');
 }
 
@@ -59,7 +37,7 @@ function renderSvg({ width, height }, content) {
   return svgMarkup`<svg xmlns="http://www.w3.org/2000/svg" width="${width}mm" height="${height}mm" viewBox="0 0 ${width} ${height}" fill="none" stroke="#000" stroke-width="${STROKE_WIDTH}">${content}</svg>`;
 }
 
-export function renderLabel(spec) {
+export function renderLabel(spec, font) {
   const { textZone } = computeLayout(spec);
-  return renderSvg(spec, renderOptionalFrame(spec) + renderTextLines(listLabelLines(spec), textZone));
+  return renderSvg(spec, renderOptionalFrame(spec) + renderTextLines(font, listLabelLines(spec), textZone));
 }

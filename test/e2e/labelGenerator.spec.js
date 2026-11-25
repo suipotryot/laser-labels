@@ -19,6 +19,21 @@ async function generate(page) {
   await page.getByRole('button', { name: 'Générer' }).click();
 }
 
+function textPathsOf(page) {
+  return page.locator('#preview svg path[aria-label]');
+}
+
+function textLinesOf(page) {
+  return textPathsOf(page).evaluateAll((paths) => paths.map((path) => path.getAttribute('aria-label')));
+}
+
+function textBoxesOf(page) {
+  return textPathsOf(page).evaluateAll((paths) => paths.map((path) => {
+    const { x, y, width, height } = path.getBBox();
+    return { left: x, top: y, right: x + width, bottom: y + height };
+  }));
+}
+
 test.describe('generate button', () => {
   test('should preview the label sized in millimeters with its text lines', async ({ page }) => {
     await fillScrewLabel(page);
@@ -28,7 +43,7 @@ test.describe('generate button', () => {
     const preview = page.locator('#preview svg');
     await expect(preview).toHaveAttribute('width', '60mm');
     await expect(preview).toHaveAttribute('height', '20mm');
-    await expect(preview.locator('text')).toHaveText(['Vis', '3,5x50', 'PZ2']);
+    expect(await textLinesOf(page)).toEqual(['Vis', '3,5x50', 'PZ2']);
   });
 
   test('should explain an invalid width instead of previewing', async ({ page }) => {
@@ -69,8 +84,24 @@ test.describe('generate button', () => {
     await generate(page);
 
     const { iconZone } = computeLayout({ width: 20, height: 60 });
-    const firstLineBaseline = Number(await page.locator('#preview svg text').first().getAttribute('y'));
-    expect(firstLineBaseline).toBeGreaterThan(iconZone.y + iconZone.height);
+    for (const textBox of await textBoxesOf(page)) {
+      expect(textBox.top).toBeGreaterThan(iconZone.y + iconZone.height);
+    }
+  });
+
+  test('should keep a long hardware name inside the label', async ({ page }) => {
+    await page.getByLabel('Largeur (mm)').fill('60');
+    await page.getByLabel('Hauteur (mm)').fill('20');
+    await page.getByLabel('Type de quincaillerie').selectOption({ label: 'Cheville Molly' });
+    await page.getByLabel('Dimensions de la pièce').fill('6x52');
+
+    await generate(page);
+
+    const textBoxes = await textBoxesOf(page);
+    expect(textBoxes).toHaveLength(2);
+    for (const textBox of textBoxes) {
+      expect(textBox.right).toBeLessThanOrEqual(60);
+    }
   });
 });
 
@@ -90,7 +121,7 @@ test.describe('hardware type select', () => {
 
     await generate(page);
 
-    await expect(page.locator('#preview svg text')).toHaveText(['Écrou', 'M6']);
+    expect(await textLinesOf(page)).toEqual(['Écrou', 'M6']);
   });
 
   test('should show the drive fields again when coming back to a screw', async ({ page }) => {
@@ -125,7 +156,7 @@ test.describe('drive type select', () => {
 
     await generate(page);
 
-    await expect(page.locator('#preview svg text')).toHaveText(['Vis', '3,5x50']);
+    expect(await textLinesOf(page)).toEqual(['Vis', '3,5x50']);
   });
 });
 
@@ -150,7 +181,8 @@ test.describe('download button', () => {
     expect(download.suggestedFilename()).toBe('vis-3,5x50-pz2.svg');
     const downloadedSvg = await readFile(await download.path(), 'utf8');
     expect(downloadedSvg).toContain('width="60mm"');
-    expect(downloadedSvg).toContain('>3,5x50</text>');
+    expect(downloadedSvg).toContain('aria-label="3,5x50"');
+    expect(downloadedSvg).not.toContain('<text');
   });
 
   test('should be disabled again once the form changes after generation', async ({ page }) => {
@@ -172,6 +204,19 @@ test.describe('download button', () => {
     await generate(page);
 
     await expect(page.getByRole('button', { name: 'Télécharger' })).toBeDisabled();
+  });
+});
+
+test.describe('font loading', () => {
+  test('should explain that labels cannot be generated when the font fails to load', async ({ page }) => {
+    await page.addInitScript(() => {
+      globalThis.fetch = () => Promise.reject(new Error('Network down'));
+    });
+
+    await page.reload();
+
+    await expect(page.getByRole('alert')).toHaveText("La police de gravure n'a pas pu être chargée : rechargez la page.");
+    await expect(page.getByRole('button', { name: 'Générer' })).toBeDisabled();
   });
 });
 
