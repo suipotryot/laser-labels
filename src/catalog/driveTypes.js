@@ -17,6 +17,11 @@ export const driveTypes = [
     sizes: ['T5', 'T6', 'T7', 'T8', 'T9', 'T10', 'T15', 'T20', 'T25', 'T27', 'T30', 'T40', 'T45', 'T50'],
   },
   {
+    key: 'torxTamperResistant',
+    name: 'Torx inviolable',
+    sizes: ['T10H', 'T15H', 'T20H', 'T25H', 'T27H', 'T30H', 'T40H'],
+  },
+  {
     key: 'hexSocket',
     name: 'Six pans creux',
     sizes: ['H1,5', 'H2', 'H2,5', 'H3', 'H4', 'H5', 'H6', 'H8', 'H10'],
