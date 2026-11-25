@@ -1,4 +1,11 @@
+function dimensionsLine(spec) {
+  return spec.dimensions ? { text: spec.dimensions } : null;
+}
+
+function driveLine(spec) {
+  return spec.drive ? { text: spec.drive.size, leadingIcon: spec.drive.type } : null;
+}
+
 export function listLabelLines(spec) {
-  const driveSize = spec.drive?.size;
-  return [spec.dimensions, driveSize].filter(Boolean);
+  return [dimensionsLine(spec), driveLine(spec)].filter(Boolean);
 }

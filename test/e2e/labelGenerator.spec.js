@@ -57,6 +57,20 @@ test.describe('generate button', () => {
     expect(await textLinesOf(page)).toEqual(['3,5x50', 'PZ2']);
   });
 
+  test('should draw the icon of the chosen drive just before its size', async ({ page }) => {
+    await fillScrewLabel(page);
+    await page.getByLabel("Type d'empreinte").selectOption({ label: 'Torx inviolable' });
+    await page.getByLabel("Taille d'empreinte").selectOption('T20H');
+
+    await generate(page);
+
+    const driveIcon = page.locator('#preview svg path[data-drive-icon]');
+    await expect(driveIcon).toHaveAttribute('data-drive-icon', 'torxTamperResistant');
+    const iconRight = await driveIcon.evaluate((path) => path.getBBox().x + path.getBBox().width);
+    const [, driveSizeBox] = await textBoxesOf(page);
+    expect(iconRight).toBeLessThan(driveSizeBox.left);
+  });
+
   test('should explain an invalid width instead of previewing', async ({ page }) => {
     await fillScrewLabel(page);
     await page.getByLabel('Largeur (mm)').fill('abc');

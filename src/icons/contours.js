@@ -106,3 +106,19 @@ export function circle(radius) {
     { type: 'Z' },
   ];
 }
+
+function fitCoordinateInCircle(key, value, { x, y, radius }) {
+  if (key.startsWith('x')) {
+    return x + value * radius;
+  }
+  if (key.startsWith('y')) {
+    return y + value * radius;
+  }
+  return value;
+}
+
+export function fitInCircle(commands, targetCircle) {
+  return commands.map((command) => Object.fromEntries(
+    Object.entries(command).map(([key, value]) => [key, fitCoordinateInCircle(key, value, targetCircle)]),
+  ));
+}

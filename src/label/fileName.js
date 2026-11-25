@@ -9,7 +9,7 @@ function toFileNamePart(line) {
 
 function listFileNameParts(spec) {
   const hardwareName = findHardwareType(spec.hardwareType).name;
-  return [hardwareName, ...listLabelLines(spec)];
+  return [hardwareName, ...listLabelLines(spec).map(({ text }) => text)];
 }
 
 export function buildFileName(spec) {

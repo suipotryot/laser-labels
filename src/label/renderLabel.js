@@ -3,6 +3,8 @@ import { outlineTextLine } from '../text/outlineTextLine.js';
 import { svgMarkup } from '../svg/svgMarkup.js';
 import { toSvgPathData } from '../svg/pathData.js';
 import { escapeXml } from '../svg/escapeXml.js';
+import { drawDriveIcon } from '../icons/driveIcons.js';
+import { fitInCircle } from '../icons/contours.js';
 
 const STROKE_WIDTH = 0.1;
 const FRAME_CORNER_RATIO = 0.1;
@@ -17,9 +19,18 @@ function renderOptionalFrame(spec) {
   return spec.hasFrame ? renderFrame(spec) : '';
 }
 
+function renderDriveIcon({ leadingIcon, iconCircle }) {
+  const pathData = toSvgPathData(fitInCircle(drawDriveIcon(leadingIcon), iconCircle));
+  return `<path data-drive-icon="${leadingIcon}" d="${pathData}"/>`;
+}
+
+function renderOptionalDriveIcon(placedLine) {
+  return placedLine.iconCircle ? renderDriveIcon(placedLine) : '';
+}
+
 function renderTextLine(font, placedLine) {
   const pathData = toSvgPathData(outlineTextLine(font, placedLine));
-  return `<path aria-label="${escapeXml(placedLine.text)}" d="${pathData}"/>`;
+  return renderOptionalDriveIcon(placedLine) + `<path aria-label="${escapeXml(placedLine.text)}" d="${pathData}"/>`;
 }
 
 function renderTextLines(spec, font) {

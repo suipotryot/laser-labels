@@ -44,6 +44,19 @@ function onCurvePointsOf(path) {
   });
 }
 
+function driveIconPathsOf(svg) {
+  return Array.from(svg.getElementsByTagName('path')).filter((path) => path.hasAttribute('data-drive-icon'));
+}
+
+function textPathOf(svg, text) {
+  return textPathsOf(svg).find((path) => path.getAttribute('aria-label') === text);
+}
+
+function horizontalSpanOf(path) {
+  const xs = onCurvePointsOf(path).map(({ x }) => x);
+  return { left: Math.min(...xs), right: Math.max(...xs) };
+}
+
 function isInsideZone(point, zone) {
   return point.x >= zone.x && point.x <= zone.x + zone.width && point.y >= zone.y && point.y <= zone.y + zone.height;
 }
@@ -82,6 +95,30 @@ describe('renderLabel', () => {
     const svg = parseSvg(renderLabel({ ...screwSpec, hasFrame: false }, font));
 
     assert.equal(svg.getElementsByTagName('rect').length, 0);
+  });
+
+  it('should draw the drive icon just before the drive size', () => {
+    const svg = parseSvg(renderLabel(screwSpec, font));
+
+    const [driveIcon] = driveIconPathsOf(svg);
+    assert.equal(driveIcon.getAttribute('data-drive-icon'), 'pozidriv');
+    assert.ok(horizontalSpanOf(driveIcon).right < horizontalSpanOf(textPathOf(svg, 'PZ2')).left);
+  });
+
+  it('should keep the drive icon inside the text zone of a narrow stacked label', () => {
+    const narrowSpec = { ...screwSpec, width: 15, height: 40, drive: { type: 'torxTamperResistant', size: 'T40H' } };
+    const { textZone } = computeLayout(narrowSpec);
+    const svg = parseSvg(renderLabel(narrowSpec, font));
+
+    for (const point of driveIconPathsOf(svg).flatMap(onCurvePointsOf)) {
+      assert.ok(isInsideZone(point, textZone), `(${point.x}, ${point.y}) is outside the text zone`);
+    }
+  });
+
+  it('should draw no drive icon when there is no drive', () => {
+    const svg = parseSvg(renderLabel({ ...screwSpec, drive: null }, font));
+
+    assert.equal(driveIconPathsOf(svg).length, 0);
   });
 
   it('should write the dimensions and the drive size as text lines, leaving the hardware type to the icon', () => {
