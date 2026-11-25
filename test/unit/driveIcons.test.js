@@ -1,10 +1,12 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { drawDriveIcon } from '../../src/icons/driveIcons.js';
+import { drawDriveIcon, thinnestDetailPerHeadRadius } from '../../src/icons/driveIcons.js';
 import { driveTypes } from '../../src/catalog/driveTypes.js';
 
 const FLOATING_POINT_TOLERANCE = 1e-9;
 const PIN_MAXIMUM_RADIUS = 0.3;
+const HEAD_RADIUS = 1;
+const CURVE_SAMPLES = 1000;
 
 function contoursOf(commands) {
   const contours = [];
@@ -86,6 +88,30 @@ function armTipsOf(corners) {
 function rootWidthOf(corners) {
   const rootCorners = corners.filter((corner) => !isTipCorner(corner, corners));
   return Math.min(...rootCorners.map((corner) => distanceBetween(corner, nearestOf(corner, rootCorners))));
+}
+
+function pointOnQuadraticCurve(start, { x1, y1, x, y }, progress) {
+  const remaining = 1 - progress;
+  return {
+    x: remaining * remaining * start.x + 2 * remaining * progress * x1 + progress * progress * x,
+    y: remaining * remaining * start.y + 2 * remaining * progress * y1 + progress * progress * y,
+  };
+}
+
+function sampledPointsOf(contour) {
+  const points = onCurvePointsOf(contour);
+  return points.slice(1).flatMap((curve, index) => Array.from(
+    { length: CURVE_SAMPLES },
+    (_, sample) => pointOnQuadraticCurve(points[index], curve, sample / CURVE_SAMPLES),
+  ));
+}
+
+function rimAroundCorners(contour) {
+  return HEAD_RADIUS - Math.max(...cornersOf(contour).map(distanceFromCenter));
+}
+
+function rimAroundCurves(contour) {
+  return HEAD_RADIUS - Math.max(...sampledPointsOf(contour).map(distanceFromCenter));
 }
 
 function isOnDiagonal({ x, y }) {
@@ -208,5 +234,51 @@ describe('drawDriveIcon', () => {
     assert.deepEqual(star, recessOf('torx')[0]);
     assert.ok(onCurvePointsOf(pin).every((point) => distanceFromCenter(point) < PIN_MAXIMUM_RADIUS), 'pin is not central');
     assert.equal(others.length, 0);
+  });
+});
+
+describe('thinnestDetailPerHeadRadius', () => {
+  it('should give the width of the thin diagonal arms of a Pozidriv drive', () => {
+    const armWidths = armTipsOf(cornersOf(recessOf('pozidriv')[0])).map(({ width }) => width);
+
+    assert.ok(isAlmostEqual(thinnestDetailPerHeadRadius('pozidriv'), Math.min(...armWidths)));
+  });
+
+  it('should give the rim of head left around the lobes of a Torx drive', () => {
+    const [star] = recessOf('torx');
+
+    assert.ok(isAlmostEqual(thinnestDetailPerHeadRadius('torx'), rimAroundCurves(star)));
+  });
+
+  it('should give the width of the arm tips of a Phillips drive', () => {
+    const armWidths = armTipsOf(cornersOf(recessOf('phillips')[0])).map(({ width }) => width);
+
+    assert.ok(isAlmostEqual(thinnestDetailPerHeadRadius('phillips'), Math.min(...armWidths)));
+  });
+
+  it('should give the narrower of the rim and the pin of a tamper resistant Torx drive', () => {
+    const [star, pin] = recessOf('torxTamperResistant');
+    const pinDiameter = 2 * Math.max(...onCurvePointsOf(pin).map(distanceFromCenter));
+
+    assert.ok(isAlmostEqual(thinnestDetailPerHeadRadius('torxTamperResistant'), Math.min(rimAroundCurves(star), pinDiameter)));
+  });
+
+  it('should give the rim of head left around the recess of a hex socket and of a square drive', () => {
+    for (const key of ['hexSocket', 'square']) {
+      assert.ok(isAlmostEqual(thinnestDetailPerHeadRadius(key), rimAroundCorners(recessOf(key)[0])), key);
+    }
+  });
+
+  it('should give the width of the slot of a slotted drive', () => {
+    const [slot] = recessOf('slotted');
+
+    assert.ok(isAlmostEqual(thinnestDetailPerHeadRadius('slotted'), Math.min(sizeOf(slot).height, rimAroundCorners(slot))));
+  });
+
+  it('should give a thinnest detail thinner than the head radius for every drive type of the catalog', () => {
+    for (const { key } of driveTypes) {
+      const thinnestDetail = thinnestDetailPerHeadRadius(key);
+      assert.ok(thinnestDetail > 0 && thinnestDetail < HEAD_RADIUS, `${key} has a thinnest detail of ${thinnestDetail}`);
+    }
   });
 });

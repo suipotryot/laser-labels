@@ -119,6 +119,11 @@ export function roundedStar({ lobeCount, outerRadius, innerRadius }) {
   return roundedPolygon(radii.map((radius, index) => pointAtAngle(radius, evenlySpacedAngle(index, radii.length))));
 }
 
+export function reachOfRoundedStar({ lobeCount, outerRadius, innerRadius }) {
+  const midpointBesideLobeTip = (innerRadius * Math.cos(Math.PI / lobeCount) + outerRadius) / 2;
+  return (midpointBesideLobeTip + outerRadius) / 2;
+}
+
 export function circle(radius) {
   const handle = radius * CIRCLE_ARC_HANDLE_RATIO;
   return [
