@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Laser labels</title>
+  <link rel="stylesheet" href="src/style.css" />
+</head>
+<body>
+  <header>
+    <h1>Laser labels</h1>
+    <p class="subtitle">Étiquettes SVG pour graver le contenu de vos boîtes de quincaillerie.</p>
+  </header>
+  <main>
+    <form id="label-form" novalidate>
+      <fieldset>
+        <legend>Étiquette</legend>
+        <label>Largeur (mm) <input id="width" inputmode="decimal" value="60" /></label>
+        <label>Hauteur (mm) <input id="height" inputmode="decimal" value="20" /></label>
+        <label><input id="has-frame" type="checkbox" /> Cadre</label>
+      </fieldset>
+      <fieldset>
+        <legend>Pièce</legend>
+        <label>Type de quincaillerie <select id="hardware-type"></select></label>
+        <label>Dimensions de la pièce <input id="dimensions" placeholder="3,5x50" /></label>
+      </fieldset>
+      <fieldset id="drive-fields">
+        <legend>Empreinte</legend>
+        <label>Type d'empreinte <select id="drive-type"></select></label>
+        <label>Taille d'empreinte <select id="drive-size"></select></label>
+      </fieldset>
+      <button type="submit">Générer</button>
+    </form>
+    <section class="result">
+      <p id="error-message" role="alert"></p>
+      <div id="preview"></div>
+      <button id="download" type="button" disabled>Télécharger</button>
+    </section>
+  </main>
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>
