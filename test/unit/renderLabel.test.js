@@ -24,8 +24,12 @@ function parseSvg(svgText) {
   return parser.parseFromString(svgText, 'image/svg+xml').documentElement;
 }
 
+function textElementsOf(svg) {
+  return Array.from(svg.getElementsByTagName('text'));
+}
+
 function textLinesOf(svg) {
-  return Array.from(svg.getElementsByTagName('text'), (text) => text.textContent);
+  return textElementsOf(svg).map((text) => text.textContent);
 }
 
 describe('renderLabel', () => {
@@ -49,9 +53,13 @@ describe('renderLabel', () => {
     const svg = parseSvg(renderLabel({ ...screwSpec, hasFrame: true }));
     const frame = svg.getElementsByTagName('rect')[0];
 
+    const strokeWidth = Number(svg.getAttribute('stroke-width'));
+
     assert.ok(Number(frame.getAttribute('rx')) > 0);
-    assert.ok(Number(frame.getAttribute('width')) > 59.8);
-    assert.ok(Number(frame.getAttribute('height')) > 19.8);
+    assert.equal(Number(frame.getAttribute('x')), strokeWidth / 2);
+    assert.equal(Number(frame.getAttribute('y')), strokeWidth / 2);
+    assert.equal(Number(frame.getAttribute('width')), screwSpec.width - strokeWidth);
+    assert.equal(Number(frame.getAttribute('height')), screwSpec.height - strokeWidth);
   });
 
   it('should not draw any frame when not asked', () => {
@@ -89,8 +97,14 @@ describe('renderLabel', () => {
     const { iconZone } = computeLayout(stackedSpec);
     const svg = parseSvg(renderLabel(stackedSpec));
 
-    for (const text of Array.from(svg.getElementsByTagName('text'))) {
+    for (const text of textElementsOf(svg)) {
       assert.ok(Number(text.getAttribute('y')) > iconZone.y + iconZone.height);
     }
+  });
+
+  it('should round every coordinate to the micrometer', () => {
+    const svgText = renderLabel({ ...screwSpec, hasFrame: true });
+
+    assert.doesNotMatch(svgText, /\d\.\d{4,}/);
   });
 });

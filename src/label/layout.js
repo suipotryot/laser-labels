@@ -1,6 +1,6 @@
 const MARGIN_RATIO = 0.08;
 const ICON_SHARE = 0.4;
-const ICON_MAX_ELONGATION = 2.5;
+export const ICON_MAX_ASPECT_RATIO = 2.5;
 
 function isTallerThanWide({ width, height }) {
   return height > width;
@@ -15,7 +15,7 @@ function innerZone({ width, height }, margin) {
 }
 
 function splitSideBySide(inner, gap) {
-  const iconWidth = Math.min(inner.width * ICON_SHARE, inner.height * ICON_MAX_ELONGATION);
+  const iconWidth = Math.min(inner.width * ICON_SHARE, inner.height * ICON_MAX_ASPECT_RATIO);
   return {
     iconZone: { ...inner, width: iconWidth },
     textZone: { ...inner, x: inner.x + iconWidth + gap, width: inner.width - iconWidth - gap },
@@ -23,7 +23,7 @@ function splitSideBySide(inner, gap) {
 }
 
 function splitOneAboveTheOther(inner, gap) {
-  const iconHeight = Math.min(inner.height * ICON_SHARE, inner.width * ICON_MAX_ELONGATION);
+  const iconHeight = Math.min(inner.height * ICON_SHARE, inner.width * ICON_MAX_ASPECT_RATIO);
   return {
     iconZone: { ...inner, height: iconHeight },
     textZone: { ...inner, y: inner.y + iconHeight + gap, height: inner.height - iconHeight - gap },

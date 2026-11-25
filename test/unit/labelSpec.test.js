@@ -20,7 +20,7 @@ describe('readLabelSpec', () => {
     assert.equal(spec.height, 20);
   });
 
-  it('should accept a comma as decimal separator in dimensions', () => {
+  it('should accept a comma as decimal separator in millimeter values', () => {
     const spec = readLabelSpec({ ...validFields, width: '62,5' });
 
     assert.equal(spec.width, 62.5);
@@ -33,7 +33,7 @@ describe('readLabelSpec', () => {
     );
   });
 
-  it('should reject a height that is zero or negative', () => {
+  it('should reject a height that is zero, negative or empty', () => {
     for (const height of ['0', '-5', '']) {
       assert.throws(
         () => readLabelSpec({ ...validFields, height }),
@@ -98,5 +98,28 @@ describe('readLabelSpec', () => {
     const spec = readLabelSpec({ ...validFields, hasFrame: true });
 
     assert.equal(spec.hasFrame, true);
+  });
+
+  it('should reject millimeter values written in a non decimal notation', () => {
+    for (const width of ['0x10', '0b11', '1e3', '9'.repeat(400)]) {
+      assert.throws(
+        () => readLabelSpec({ ...validFields, width }),
+        { name: 'LabelSpecError', field: 'width', reason: 'notAPositiveNumber' },
+      );
+    }
+  });
+
+  it('should reject a width or height too small to engrave a label', () => {
+    assert.throws(
+      () => readLabelSpec({ ...validFields, height: '4,9' }),
+      { name: 'LabelSpecError', field: 'height', reason: 'tooSmall' },
+    );
+  });
+
+  it('should reject part dimensions containing control characters', () => {
+    assert.throws(
+      () => readLabelSpec({ ...validFields, dimensions: '3,5x50' }),
+      { name: 'LabelSpecError', field: 'dimensions', reason: 'invalidCharacters' },
+    );
   });
 });

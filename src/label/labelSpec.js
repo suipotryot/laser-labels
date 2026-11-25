@@ -10,14 +10,25 @@ export class LabelSpecError extends Error {
   }
 }
 
+const MINIMUM_LABEL_SIDE_MILLIMETERS = 5;
+const DECIMAL_NOTATION = /^\d+([.,]\d+)?$/;
+
 function isPositiveNumber(value) {
   return Number.isFinite(value) && value > 0;
 }
 
-function readMillimeters(fields, field) {
-  const millimeters = Number(fields[field].replace(',', '.'));
+function parseDecimal(text) {
+  const trimmedText = text.trim();
+  return DECIMAL_NOTATION.test(trimmedText) ? Number(trimmedText.replace(',', '.')) : NaN;
+}
+
+function readLabelSide(fields, fieldName) {
+  const millimeters = parseDecimal(fields[fieldName]);
   if (!isPositiveNumber(millimeters)) {
-    throw new LabelSpecError(field, 'notAPositiveNumber');
+    throw new LabelSpecError(fieldName, 'notAPositiveNumber');
+  }
+  if (millimeters < MINIMUM_LABEL_SIDE_MILLIMETERS) {
+    throw new LabelSpecError(fieldName, 'tooSmall');
   }
   return millimeters;
 }
@@ -44,17 +55,27 @@ function readDrive(fields, hardwareType) {
   if (!driveType.sizes.includes(fields.driveSize)) {
     throw new LabelSpecError('driveSize', 'unknown');
   }
-  return { type: fields.driveType, size: fields.driveSize };
+  return { type: driveType.key, size: fields.driveSize };
+}
+
+const CONTROL_CHARACTERS = /\p{Cc}/u;
+
+function readDimensions(fields) {
+  const dimensions = fields.dimensions.trim();
+  if (CONTROL_CHARACTERS.test(dimensions)) {
+    throw new LabelSpecError('dimensions', 'invalidCharacters');
+  }
+  return dimensions;
 }
 
 export function readLabelSpec(fields) {
   const hardwareType = readHardwareType(fields);
   return {
-    width: readMillimeters(fields, 'width'),
-    height: readMillimeters(fields, 'height'),
+    width: readLabelSide(fields, 'width'),
+    height: readLabelSide(fields, 'height'),
     hardwareType: hardwareType.key,
     drive: readDrive(fields, hardwareType),
-    dimensions: fields.dimensions.trim(),
+    dimensions: readDimensions(fields),
     hasFrame: fields.hasFrame,
   };
 }

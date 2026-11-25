@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { computeLayout } from '../../src/label/layout.js';
+import { computeLayout, ICON_MAX_ASPECT_RATIO } from '../../src/label/layout.js';
 
 describe('computeLayout', () => {
   it('should choose a landscape layout when the label is wider than tall', () => {
@@ -40,14 +40,14 @@ describe('computeLayout', () => {
   it('should give the text the extra room of a very long label', () => {
     const { iconZone, textZone } = computeLayout({ width: 200, height: 20 });
 
-    assert.ok(iconZone.width <= iconZone.height * 2.5);
+    assert.ok(iconZone.width <= iconZone.height * ICON_MAX_ASPECT_RATIO);
     assert.ok(textZone.width > iconZone.width * 2);
   });
 
   it('should give the text the extra room of a very tall label', () => {
     const { iconZone, textZone } = computeLayout({ width: 20, height: 200 });
 
-    assert.ok(iconZone.height <= iconZone.width * 2.5);
+    assert.ok(iconZone.height <= iconZone.width * ICON_MAX_ASPECT_RATIO);
     assert.ok(textZone.height > iconZone.height * 2);
   });
 });

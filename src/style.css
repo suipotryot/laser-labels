@@ -126,8 +126,17 @@ button:disabled {
   margin: 0 0 0.5rem;
 }
 
+#preview-status {
+  color: var(--text-muted);
+  margin: 0 0 0.5rem;
+}
+
 #preview {
   margin-bottom: 1rem;
+}
+
+#preview.is-outdated {
+  opacity: 0.4;
 }
 
 #preview svg {

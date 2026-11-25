@@ -4,5 +4,5 @@ export function downloadSvg(svgText, fileName) {
   link.href = url;
   link.download = fileName;
   link.click();
-  URL.revokeObjectURL(url);
+  setTimeout(() => URL.revokeObjectURL(url));
 }

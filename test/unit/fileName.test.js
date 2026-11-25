@@ -16,7 +16,7 @@ describe('buildFileName', () => {
     assert.equal(buildFileName(screwSpec), 'vis-3,5x50-pz2.svg');
   });
 
-  it('should replace spaces and drop characters forbidden in file names', () => {
+  it('should join words with dashes and drop characters forbidden in file names', () => {
     const spec = { ...screwSpec, hardwareType: 'mollyAnchor', drive: null, dimensions: '1/2" : M5 x 52 *?<>|\\' };
 
     assert.equal(buildFileName(spec), 'cheville-molly-12-m5-x-52.svg');

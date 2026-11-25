@@ -19,11 +19,14 @@ describe('describeLabelSpecError', () => {
   it('should describe every error the label spec reader can raise', () => {
     const raisableErrors = [
       ['width', 'notAPositiveNumber'],
+      ['width', 'tooSmall'],
       ['height', 'notAPositiveNumber'],
+      ['height', 'tooSmall'],
       ['hardwareType', 'unknown'],
       ['driveType', 'notApplicable'],
       ['driveType', 'unknown'],
       ['driveSize', 'unknown'],
+      ['dimensions', 'invalidCharacters'],
     ];
 
     for (const [field, reason] of raisableErrors) {
