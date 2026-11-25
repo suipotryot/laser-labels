@@ -216,21 +216,23 @@ describe('drawHardwareIcon', () => {
     assert.ok(Math.min(...threads.map(([start]) => start.x)) > hookEnd, 'the threads run under the hook');
   });
 
-  it('should draw a wall plug lying with a collar on the left, finned edges, a flat end and a split along its axis', () => {
+  it('should draw a wall plug lying with a collar on the left, small fins, a rounded end and a ladder along its axis', () => {
     const { outline, strokes } = drawHardwareIcon('wallPlug');
 
     const [contour, ...others] = contoursOf(outline);
     assert.equal(others.length, 0);
-    const corners = cornersOf(contour);
-    const extent = extentOf(corners);
+    const points = onCurvePointsOf(contour);
+    const extent = extentOf(points);
     assert.ok(extent.right - extent.left > 3 * (extent.bottom - extent.top), 'the wall plug is not lying');
-    const collarCorners = corners.filter(({ y }) => isAlmostEqual(y, extent.top));
-    assert.ok(Math.max(...collarCorners.map(({ x }) => x)) < extent.left + (extent.right - extent.left) / 10, 'no collar on the left');
-    assert.ok(directionChangesAlong(corners, true) > 6, 'no fins along the edges');
-    assert.equal(cornersAt(corners, extent.right).length, 2, 'the end is not flat');
-    const split = strokesOf(strokes).find(([start, end]) => isAlmostEqual(start.y, 0) && isAlmostEqual(end.y, 0));
-    assert.ok(split, 'no split along the axis');
-    assert.ok(isAlmostEqual(Math.max(split[0].x, split[1].x), extent.right), 'the split does not reach the end');
+    const collarPoints = points.filter(({ y }) => isAlmostEqual(y, extent.top));
+    assert.ok(Math.max(...collarPoints.map(({ x }) => x)) < extent.left + (extent.right - extent.left) / 10, 'no collar on the left');
+    assert.ok(directionChangesAlong(cornersOf(contour), true) > 6, 'no fins along the edges');
+    assert.ok(contour.some(({ type, x1 }) => type === 'Q' && x1 > extent.right - 0.5), 'the end is not rounded');
+    const lines = strokesOf(strokes).filter((stroke) => stroke.length === 2);
+    const rails = lines.filter(([start, end]) => isAlmostEqual(start.y, end.y) && end.x - start.x > (extent.right - extent.left) / 2);
+    const rungs = lines.filter(([start, end]) => isAlmostEqual(start.x, end.x) && Math.abs(start.y) < 0.2 && Math.abs(end.y) < 0.2);
+    assert.equal(rails.length, 2, 'no two rails along the axis');
+    assert.ok(rungs.length > 4, 'no rungs between the rails');
   });
 
   it('should draw a Molly anchor lying with a head and a tall thin flange on the left, a slotted sleeve and a flat end', () => {

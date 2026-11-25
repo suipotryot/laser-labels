@@ -67,15 +67,22 @@ const HOOK = {
   tipEnd: 3.7,
 };
 const WALL_PLUG = {
-  collarRadius: 0.45,
-  collarDepth: 0.15,
-  bodyRadius: 0.26,
-  finRadius: 0.34,
-  finStart: 0.5,
-  finPitch: 0.3,
-  finCount: 7,
-  splitStart: 1.9,
-  end: 3,
+  collarRadius: 0.4,
+  collarDepth: 0.2,
+  collarRounding: 0.05,
+  bodyRadius: 0.32,
+  endRadius: 0.27,
+  endRounding: 0.2,
+  wingStart: 0.55,
+  wingReach: 0.12,
+  finRise: 0.05,
+  finStart: 0.9,
+  finPitch: 0.22,
+  finCount: 9,
+  railRadius: 0.1,
+  railStart: 0.3,
+  rungPitch: 0.3,
+  end: 3.1,
 };
 const MOLLY_ANCHOR = {
   headRadius: 0.32,
@@ -261,32 +268,52 @@ function drawHook() {
   return { outline: solid(hookBody()), strokes: diagonalThreadStrokes(HOOK) };
 }
 
+function bodyRadiusAt(x) {
+  const taper = (x - WALL_PLUG.collarDepth) / (WALL_PLUG.end - WALL_PLUG.collarDepth);
+  return WALL_PLUG.bodyRadius + (WALL_PLUG.endRadius - WALL_PLUG.bodyRadius) * taper;
+}
+
 function finEdge(side) {
   return Array.from({ length: WALL_PLUG.finCount }, (_, index) => WALL_PLUG.finStart + index * WALL_PLUG.finPitch)
     .flatMap((finX) => [
-      atSide(finX, WALL_PLUG.bodyRadius, side),
-      atSide(finX, WALL_PLUG.finRadius, side),
-      atSide(finX + WALL_PLUG.finPitch * 0.85, WALL_PLUG.bodyRadius, side),
+      atSide(finX, bodyRadiusAt(finX), side),
+      atSide(finX, bodyRadiusAt(finX) + WALL_PLUG.finRise, side),
+      atSide(finX + WALL_PLUG.finPitch * 0.85, bodyRadiusAt(finX + WALL_PLUG.finPitch * 0.85), side),
     ]);
 }
 
 function wallPlugEdge(side) {
   return [
-    atSide(0, WALL_PLUG.collarRadius, side),
-    atSide(WALL_PLUG.collarDepth, WALL_PLUG.collarRadius, side),
+    { ...atSide(0, WALL_PLUG.collarRadius, side), rounding: WALL_PLUG.collarRounding },
+    { ...atSide(WALL_PLUG.collarDepth, WALL_PLUG.collarRadius, side), rounding: WALL_PLUG.collarRounding },
     atSide(WALL_PLUG.collarDepth, WALL_PLUG.bodyRadius, side),
     ...finEdge(side),
-    atSide(WALL_PLUG.end, WALL_PLUG.bodyRadius, side),
+    { ...atSide(WALL_PLUG.end, WALL_PLUG.endRadius, side), rounding: WALL_PLUG.endRounding },
   ];
+}
+
+function antiRotationWings() {
+  return [TOP, BOTTOM].flatMap((side) => polyline([
+    atSide(WALL_PLUG.wingStart, bodyRadiusAt(WALL_PLUG.wingStart), side),
+    atSide(WALL_PLUG.collarDepth + 0.08, WALL_PLUG.bodyRadius + WALL_PLUG.wingReach, side),
+  ]));
+}
+
+function ladder() {
+  const railEnd = WALL_PLUG.end - WALL_PLUG.endRounding;
+  const rails = [TOP, BOTTOM].flatMap((side) => polyline([
+    atSide(WALL_PLUG.railStart, WALL_PLUG.railRadius, side),
+    atSide(railEnd, WALL_PLUG.railRadius, side),
+  ]));
+  const rungs = evenlySpacedPositions({ from: WALL_PLUG.railStart + WALL_PLUG.rungPitch, to: railEnd - WALL_PLUG.rungPitch / 2, pitch: WALL_PLUG.rungPitch })
+    .flatMap((x) => verticalStroke(x, WALL_PLUG.railRadius));
+  return [...rails, ...rungs];
 }
 
 function drawWallPlug() {
   return {
     outline: mirroredOutline(wallPlugEdge),
-    strokes: [
-      ...verticalStroke(WALL_PLUG.collarDepth, WALL_PLUG.bodyRadius),
-      ...polyline([{ x: WALL_PLUG.splitStart, y: 0 }, { x: WALL_PLUG.end, y: 0 }]),
-    ],
+    strokes: [...verticalStroke(WALL_PLUG.collarDepth, WALL_PLUG.bodyRadius), ...antiRotationWings(), ...ladder()],
   };
 }
 
@@ -330,7 +357,7 @@ function gapBetweenDiagonalThreads(piece) {
 const HARDWARE_DRAWINGS = {
   screw: { draw: drawScrew, thinnestDetail: Math.min(gapBetweenDiagonalThreads(SCREW), 2 * SCREW.shankRadius) },
   hook: { draw: drawHook, thinnestDetail: Math.min(gapBetweenDiagonalThreads(HOOK), 2 * HOOK.shankRadius) },
-  wallPlug: { draw: drawWallPlug, thinnestDetail: Math.min(WALL_PLUG.collarDepth, WALL_PLUG.finRadius - WALL_PLUG.bodyRadius) },
+  wallPlug: { draw: drawWallPlug, thinnestDetail: Math.min(WALL_PLUG.finRise, WALL_PLUG.railRadius * 2) },
   mollyAnchor: {
     draw: drawMollyAnchor,
     thinnestDetail: Math.min(MOLLY_ANCHOR.flangeEnd - MOLLY_ANCHOR.headDepth, 2 * MOLLY_ANCHOR.slotHalfWidth),
