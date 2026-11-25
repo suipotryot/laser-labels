@@ -136,11 +136,6 @@ export function circle(radius) {
   ];
 }
 
-export function threeQuarterArc(radius) {
-  const [move, ...quarters] = circle(radius);
-  return [move, ...quarters.slice(0, 3)];
-}
-
 const COORDINATE_PAIRS = [['x', 'y'], ['x1', 'y1'], ['x2', 'y2']];
 
 function placeCommandInCircle(command, { x, y, radius }) {

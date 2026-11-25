@@ -77,7 +77,7 @@ describe('drawHardwareIcon', () => {
     assert.throws(() => drawHardwareIcon('spaceship'), /No icon for hardware type: spaceship/);
   });
 
-  it('should draw a screw lying with its head on the left, a pointed tip, a sawtooth thread and thread strokes', () => {
+  it('should draw a screw lying with its head on the left, straight edges, a pointed tip and diagonal threads crossing its edges', () => {
     const { outline, strokes } = drawHardwareIcon('screw');
 
     const [contour, ...others] = contoursOf(outline);
@@ -91,9 +91,14 @@ describe('drawHardwareIcon', () => {
     const tip = cornersAt(corners, extent.right);
     assert.equal(tip.length, 1);
     assert.ok(isAlmostEqual(tip[0].y, 0), 'the tip is not on the axis');
-    assert.ok(directionChangesAlong(corners, true) > 10, 'no sawtooth thread along the top edge');
-    assert.ok(strokes.length > 0, 'no thread strokes');
-    assert.ok(strokes.every((command) => command.type !== 'Z'), 'thread strokes are closed');
+    assert.equal(directionChangesAlong(corners, true), 0, 'the top edge is not straight');
+    const shankRadius = Math.min(...corners.filter(({ y }) => y < 0).map(({ y }) => -y));
+    const threads = strokesOf(strokes);
+    assert.ok(threads.length > 5, 'no thread strokes');
+    for (const [start, end] of threads) {
+      assert.ok(start.x !== end.x, 'a thread stroke is not diagonal');
+      assert.ok(Math.abs(start.y) > shankRadius && Math.abs(end.y) > shankRadius, 'a thread stroke does not cross the edges');
+    }
   });
 
   it('should draw a nail lying with a flat thin head on the left and a pointed tip, without strokes', () => {
@@ -113,7 +118,7 @@ describe('drawHardwareIcon', () => {
     assert.equal(strokes.length, 0);
   });
 
-  it('should draw a bolt lying with its head on the left, a nut along its shank, a flat end and straight thread strokes', () => {
+  it('should draw a bolt lying with a hexagonal head on the left, a flat end and straight threads along all its shank', () => {
     const { outline, strokes } = drawHardwareIcon('bolt');
 
     const [contour, ...others] = contoursOf(outline);
@@ -123,14 +128,19 @@ describe('drawHardwareIcon', () => {
     const length = extent.right - extent.left;
     assert.ok(length > 3 * (extent.bottom - extent.top), 'the bolt is not lying');
     const tallestCorners = corners.filter(({ y }) => isAlmostEqual(y, extent.top));
-    assert.ok(tallestCorners.some(({ x }) => x < extent.left + length / 4), 'no head on the left');
-    assert.ok(tallestCorners.some(({ x }) => x > extent.left + length / 2), 'no nut along the shank');
+    assert.ok(tallestCorners.every(({ x }) => x < extent.left + length / 4), 'something else than the head is as tall');
     assert.equal(cornersAt(corners, extent.right).length, 2, 'the end is not flat');
-    const straightThreads = strokesOf(strokes).filter(([start, end]) => isAlmostEqual(start.x, end.x));
-    assert.ok(straightThreads.length > 5, 'no straight thread strokes');
+    const headEnd = Math.max(...tallestCorners.map(({ x }) => x));
+    const verticalStrokes = strokesOf(strokes).filter(([start, end]) => isAlmostEqual(start.x, end.x));
+    const fullHeightStrokes = verticalStrokes.filter(([start, end]) => isAlmostEqual(Math.abs(end.y - start.y), extent.bottom - extent.top));
+    assert.ok(fullHeightStrokes.some(([start]) => isAlmostEqual(start.x, headEnd)), 'no full line between the head and the shank');
+    assert.ok(fullHeightStrokes.some(([start]) => start.x < headEnd), 'no line at the chamfered corner of the head');
+    const threads = verticalStrokes.filter(([start]) => start.x > headEnd);
+    assert.ok(Math.min(...threads.map(([start]) => start.x)) < headEnd + length / 10, 'threads do not start near the head');
+    assert.ok(Math.max(...threads.map(([start]) => start.x)) > extent.right - length / 10, 'threads do not reach the end');
   });
 
-  it('should draw a nut seen from the front as a hexagon with a hollow round hole and an open thread arc', () => {
+  it('should draw a nut seen from the front as a hexagon with a hollow round hole, without strokes', () => {
     const { outline, strokes } = drawHardwareIcon('nut');
 
     const [hexagon, hole, ...others] = contoursOf(outline);
@@ -138,7 +148,6 @@ describe('drawHardwareIcon', () => {
     assert.equal(cornersOf(hexagon).length, 6);
     assert.ok(hole.some(({ type }) => type === 'C'), 'the hole is not round');
     assert.notEqual(windingOf(hole), windingOf(hexagon), 'the hole would be filled');
-    assert.ok(strokes.length > 0, 'no thread arc');
-    assert.ok(strokes.every((command) => command.type !== 'Z'), 'the thread arc is closed');
+    assert.equal(strokes.length, 0);
   });
 });
