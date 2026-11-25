@@ -1,10 +1,7 @@
 import { placeLabelTextLines } from './placeLabelTextLines.js';
+import { capHeightPerFontSize } from '../text/fontMetrics.js';
 
 const MINIMUM_READABLE_CAP_HEIGHT_MILLIMETERS = 1.5;
-
-function capHeightPerFontSize(font) {
-  return font.tables.os2.sCapHeight / font.unitsPerEm;
-}
 
 function isLineTooSmallToRead(font, { fontSize }) {
   return fontSize * capHeightPerFontSize(font) < MINIMUM_READABLE_CAP_HEIGHT_MILLIMETERS;

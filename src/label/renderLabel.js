@@ -3,6 +3,8 @@ import { outlineTextLine } from '../text/outlineTextLine.js';
 import { svgMarkup } from '../svg/svgMarkup.js';
 import { toSvgPathData } from '../svg/pathData.js';
 import { escapeXml } from '../svg/escapeXml.js';
+import { hasLeadingIcon } from '../text/fitTextLines.js';
+import { drawDriveIconInCircle } from '../icons/driveIcons.js';
 
 const STROKE_WIDTH = 0.1;
 const FRAME_CORNER_RATIO = 0.1;
@@ -17,14 +19,27 @@ function renderOptionalFrame(spec) {
   return spec.hasFrame ? renderFrame(spec) : '';
 }
 
-function renderTextLine(font, placedLine) {
+function renderDriveIcon({ leadingIcon, leadingIconCircle }) {
+  const pathData = toSvgPathData(drawDriveIconInCircle(leadingIcon, leadingIconCircle));
+  return `<path data-drive-icon="${escapeXml(leadingIcon)}" d="${pathData}"/>`;
+}
+
+function renderOptionalDriveIcon(placedLine) {
+  return hasLeadingIcon(placedLine) ? renderDriveIcon(placedLine) : '';
+}
+
+function renderLineText(font, placedLine) {
   const pathData = toSvgPathData(outlineTextLine(font, placedLine));
   return `<path aria-label="${escapeXml(placedLine.text)}" d="${pathData}"/>`;
 }
 
-function renderTextLines(spec, font) {
+function renderLine(font, placedLine) {
+  return renderOptionalDriveIcon(placedLine) + renderLineText(font, placedLine);
+}
+
+function renderLines(spec, font) {
   return placeLabelTextLines(spec, font)
-    .map((placedLine) => renderTextLine(font, placedLine))
+    .map((placedLine) => renderLine(font, placedLine))
     .join('');
 }
 
@@ -33,5 +48,5 @@ function renderSvg({ width, height }, content) {
 }
 
 export function renderLabel(spec, font) {
-  return renderSvg(spec, renderOptionalFrame(spec) + renderTextLines(spec, font));
+  return renderSvg(spec, renderOptionalFrame(spec) + renderLines(spec, font));
 }

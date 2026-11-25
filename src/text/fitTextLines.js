@@ -1,6 +1,10 @@
-function fontBoxHeightPerFontSize(font) {
-  const { yMax, yMin } = font.tables.head;
-  return (yMax - yMin) / font.unitsPerEm;
+import { capHeightPerFontSize, fontBoxHeightPerFontSize, fontBoxTopPerFontSize } from './fontMetrics.js';
+
+const LEADING_ICON_DIAMETER_PER_FONT_SIZE = 0.9;
+const LEADING_ICON_GAP_PER_FONT_SIZE = 0.3;
+
+export function hasLeadingIcon(line) {
+  return Boolean(line.leadingIcon);
 }
 
 function fontSizeAllowedByHeight(font, lines, zone) {
@@ -12,9 +16,17 @@ function inkSpanPerFontSize(font, text) {
   return { left: x1, width: x2 - x1 };
 }
 
+function leadingIconAdvancePerFontSize(line) {
+  return hasLeadingIcon(line) ? LEADING_ICON_DIAMETER_PER_FONT_SIZE + LEADING_ICON_GAP_PER_FONT_SIZE : 0;
+}
+
+function lineWidthPerFontSize(font, line) {
+  return leadingIconAdvancePerFontSize(line) + inkSpanPerFontSize(font, line.text).width;
+}
+
 function fontSizeAllowedByWidth(font, lines, zone) {
-  const widestInkPerFontSize = Math.max(...lines.map((text) => inkSpanPerFontSize(font, text).width));
-  return zone.width / widestInkPerFontSize;
+  const widestLinePerFontSize = Math.max(...lines.map((line) => lineWidthPerFontSize(font, line)));
+  return zone.width / widestLinePerFontSize;
 }
 
 function largestFittingFontSize(font, lines, zone) {
@@ -25,12 +37,23 @@ function topOfCenteredBlock(zone, blockHeight) {
   return zone.y + (zone.height - blockHeight) / 2;
 }
 
-function fontBoxTopPerFontSize(font) {
-  return font.tables.head.yMax / font.unitsPerEm;
+function xStartingInkAt(font, text, leftEdge, fontSize) {
+  return leftEdge - inkSpanPerFontSize(font, text).left * fontSize;
 }
 
-function xAligningInkOnZoneLeft(font, text, zone, fontSize) {
-  return zone.x - inkSpanPerFontSize(font, text).left * fontSize;
+function middleOfCapitals(font, { fontSize, baseline }) {
+  return baseline - (fontSize * capHeightPerFontSize(font)) / 2;
+}
+
+function leadingIconCircle(font, zone, placedLine) {
+  const radius = (placedLine.fontSize * LEADING_ICON_DIAMETER_PER_FONT_SIZE) / 2;
+  return { x: zone.x + radius, y: middleOfCapitals(font, placedLine), radius };
+}
+
+function placeLine(font, line, zone, { fontSize, baseline }) {
+  const textLeftEdge = zone.x + leadingIconAdvancePerFontSize(line) * fontSize;
+  const placedLine = { ...line, x: xStartingInkAt(font, line.text, textLeftEdge, fontSize), baseline, fontSize };
+  return hasLeadingIcon(line) ? { ...placedLine, leadingIconCircle: leadingIconCircle(font, zone, placedLine) } : placedLine;
 }
 
 export function fitTextLines(font, lines, zone) {
@@ -38,10 +61,6 @@ export function fitTextLines(font, lines, zone) {
   const lineBoxHeight = fontSize * fontBoxHeightPerFontSize(font);
   const blockTop = topOfCenteredBlock(zone, lineBoxHeight * lines.length);
   const firstBaseline = blockTop + fontSize * fontBoxTopPerFontSize(font);
-  return lines.map((text, index) => ({
-    text,
-    x: xAligningInkOnZoneLeft(font, text, zone, fontSize),
-    baseline: firstBaseline + lineBoxHeight * index,
-    fontSize,
-  }));
+  const baselineOf = (index) => firstBaseline + lineBoxHeight * index;
+  return lines.map((line, index) => placeLine(font, line, zone, { fontSize, baseline: baselineOf(index) }));
 }
