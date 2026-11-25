@@ -17,6 +17,7 @@ const BOLT = {
   chamfer: 0.08,
   headDepth: 0.6,
   shankRadius: 0.3,
+  threadOverhang: 0.07,
   threadPitch: 0.15,
   end: 3.6,
 };
@@ -96,7 +97,7 @@ function straightThreadStrokes() {
   const threadStart = BOLT.headDepth + BOLT.threadPitch;
   const threadCount = Math.floor((BOLT.end - BOLT.chamfer - threadStart) / BOLT.threadPitch) + 1;
   return Array.from({ length: threadCount }, (_, index) => threadStart + index * BOLT.threadPitch)
-    .flatMap((x) => verticalStroke(x, BOLT.shankRadius));
+    .flatMap((x) => verticalStroke(x, BOLT.shankRadius + BOLT.threadOverhang));
 }
 
 function drawBolt() {

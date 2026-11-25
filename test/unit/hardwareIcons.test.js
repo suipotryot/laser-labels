@@ -136,6 +136,8 @@ describe('drawHardwareIcon', () => {
     assert.ok(fullHeightStrokes.some(([start]) => isAlmostEqual(start.x, headEnd)), 'no full line between the head and the shank');
     assert.ok(fullHeightStrokes.some(([start]) => start.x < headEnd), 'no line at the chamfered corner of the head');
     const threads = verticalStrokes.filter(([start]) => start.x > headEnd);
+    const shankRadius = Math.abs(cornersAt(corners, headEnd).find(({ y }) => !isAlmostEqual(y, extent.top) && y < 0).y);
+    assert.ok(threads.every(([start, end]) => Math.abs(start.y) > shankRadius && Math.abs(end.y) > shankRadius), 'threads do not cross the edges');
     assert.ok(Math.min(...threads.map(([start]) => start.x)) < headEnd + length / 10, 'threads do not start near the head');
     assert.ok(Math.max(...threads.map(([start]) => start.x)) > extent.right - length / 10, 'threads do not reach the end');
   });
