@@ -248,6 +248,14 @@ test.describe('preview', () => {
 });
 
 test.describe('hardware type select', () => {
+  test('should draw the silhouette of the chosen hardware', async ({ page }) => {
+    await fillScrewLabel(page);
+
+    await page.getByLabel('Type de quincaillerie').selectOption({ label: 'Boulon' });
+
+    await expect(previewSvgOf(page).locator('path[data-hardware-icon]')).toHaveAttribute('data-hardware-icon', 'bolt');
+  });
+
   test('should hide the drive fields for hardware without drive', async ({ page }) => {
     await fillScrewLabel(page);
 

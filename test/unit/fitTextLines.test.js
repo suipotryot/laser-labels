@@ -98,6 +98,27 @@ describe('fitTextLines', () => {
     assertWithinZoneWidth(placedLines, widthLimitingZone);
   });
 
+  it('should give a scaled line its scale times the font size of the other lines', () => {
+    const [dimensionsLine, driveLine] = fitTextLines(font, [{ text: '3,5x50', scale: 1.5 }, { text: 'PZ2' }], zone);
+
+    assertAlmostEqual(dimensionsLine.fontSize, 1.5 * driveLine.fontSize);
+  });
+
+  it('should fill the zone height exactly with a scaled line among short lines', () => {
+    const placedLines = fitTextLines(font, [{ text: 'M6', scale: 1.5 }, { text: 'PZ2' }], zone);
+
+    const top = lineBoxOf(placedLines[0]).top;
+    const bottom = lineBoxOf(placedLines.at(-1)).bottom;
+    assertAlmostEqual(top, zone.y);
+    assertAlmostEqual(bottom, zone.y + zone.height);
+  });
+
+  it('should keep a long scaled line within the zone width', () => {
+    const placedLines = fitTextLines(font, [{ text: 'M5 x 52 tête fraisée', scale: 1.5 }, { text: 'PZ2' }], widthLimitingZone);
+
+    assertWithinZoneWidth(placedLines, widthLimitingZone);
+  });
+
   it('should give every line the same font size', () => {
     const placedLines = fitTextLines(font, textLines('Cheville Molly', '6x52'), zone);
 

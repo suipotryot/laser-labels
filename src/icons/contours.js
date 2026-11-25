@@ -138,17 +138,42 @@ export function circle(radius) {
 
 const COORDINATE_PAIRS = [['x', 'y'], ['x1', 'y1'], ['x2', 'y2']];
 
-function placeCommandInCircle(command, { x, y, radius }) {
-  const placedCommand = { ...command };
+function movePointsOf(command, movePoint) {
+  const movedCommand = { ...command };
   for (const [xKey, yKey] of COORDINATE_PAIRS.filter(([xKey]) => xKey in command)) {
-    placedCommand[xKey] = x + command[xKey] * radius;
-    placedCommand[yKey] = y + command[yKey] * radius;
+    const moved = movePoint({ x: command[xKey], y: command[yKey] });
+    movedCommand[xKey] = moved.x;
+    movedCommand[yKey] = moved.y;
   }
-  return placedCommand;
+  return movedCommand;
 }
 
-export function placeInCircle(unitDrawing, targetCircle) {
-  return unitDrawing.map((command) => placeCommandInCircle(command, targetCircle));
+function movePoints(drawing, movePoint) {
+  return drawing.map((command) => movePointsOf(command, movePoint));
+}
+
+export function placeInCircle(unitDrawing, { x, y, radius }) {
+  return movePoints(unitDrawing, (point) => ({ x: x + point.x * radius, y: y + point.y * radius }));
+}
+
+function extentOf(drawing) {
+  const points = drawing.filter((command) => command.type !== 'Z');
+  const xs = points.map((point) => point.x);
+  const ys = points.map((point) => point.y);
+  return { left: Math.min(...xs), top: Math.min(...ys), width: Math.max(...xs) - Math.min(...xs), height: Math.max(...ys) - Math.min(...ys) };
+}
+
+function turnedUpright(drawing) {
+  return movePoints(drawing, ({ x, y }) => ({ x: -y, y: x }));
+}
+
+export function placeInBox(lyingDrawing, box, { upright }) {
+  const drawing = upright ? turnedUpright(lyingDrawing) : lyingDrawing;
+  const extent = extentOf(drawing);
+  const scale = Math.min(box.width / extent.width, box.height / extent.height);
+  const left = box.x + (box.width - extent.width * scale) / 2;
+  const top = box.y + (box.height - extent.height * scale) / 2;
+  return movePoints(drawing, (point) => ({ x: left + (point.x - extent.left) * scale, y: top + (point.y - extent.top) * scale }));
 }
 
 function signedAreaOnScreen(contour) {

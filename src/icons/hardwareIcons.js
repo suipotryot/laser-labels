@@ -1,4 +1,4 @@
-import { circle, hollow, polygon, polyline, regularPolygon, solid } from './contours.js';
+import { circle, hollow, placeInBox, polygon, polyline, regularPolygon, solid } from './contours.js';
 
 const SCREW = {
   headRadius: 0.5,
@@ -121,10 +121,20 @@ const HARDWARE_DRAWINGS = {
   nut: drawNut,
 };
 
+export function hasHardwareIcon(hardwareTypeKey) {
+  return hardwareTypeKey in HARDWARE_DRAWINGS;
+}
+
 export function drawHardwareIcon(hardwareTypeKey) {
   const drawHardware = HARDWARE_DRAWINGS[hardwareTypeKey];
   if (!drawHardware) {
     throw new Error(`No icon for hardware type: ${hardwareTypeKey}`);
   }
   return drawHardware();
+}
+
+export function drawHardwareIconInBox(hardwareTypeKey, box, { upright }) {
+  const { outline, strokes } = drawHardwareIcon(hardwareTypeKey);
+  const placed = placeInBox([...outline, ...strokes], box, { upright });
+  return { outline: placed.slice(0, outline.length), strokes: placed.slice(outline.length) };
 }

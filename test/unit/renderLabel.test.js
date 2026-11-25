@@ -49,6 +49,10 @@ function driveIconPathsOf(svg) {
   return Array.from(svg.getElementsByTagName('path')).filter((path) => path.hasAttribute('data-drive-icon'));
 }
 
+function pathsWithAttribute(svg, attribute) {
+  return Array.from(svg.getElementsByTagName('path')).filter((path) => path.hasAttribute(attribute));
+}
+
 function textPathOf(svg, text) {
   return textPathsOf(svg).find((path) => path.getAttribute('aria-label') === text);
 }
@@ -133,6 +137,43 @@ describe('renderLabel', () => {
     const [driveIcon] = driveIconPathsOf(svg);
     assert.deepEqual(horizontalSpanOf(driveIcon), { left: roundToMicrometer(x - radius), right: roundToMicrometer(x + radius) });
     assert.deepEqual(verticalSpanOf(driveIcon), { top: roundToMicrometer(y - radius), bottom: roundToMicrometer(y + radius) });
+  });
+
+  it('should draw the hardware silhouette and its strokes inside the icon zone', () => {
+    const { iconZone } = computeLayout(screwSpec);
+    const svg = parseSvg(renderLabel(screwSpec, font));
+
+    const [silhouette] = pathsWithAttribute(svg, 'data-hardware-icon');
+    const [strokes] = pathsWithAttribute(svg, 'data-hardware-strokes');
+    assert.equal(silhouette.getAttribute('data-hardware-icon'), 'screw');
+    assert.equal(strokes.getAttribute('data-hardware-strokes'), 'screw');
+    for (const point of [silhouette, strokes].flatMap(onCurvePointsOf)) {
+      assert.ok(isInsideZone(point, iconZone), `(${point.x}, ${point.y}) is outside the icon zone`);
+    }
+  });
+
+  it('should stand the silhouette upright in the icon zone of a label taller than wide', () => {
+    const stackedSpec = { ...screwSpec, width: 20, height: 60 };
+    const { iconZone } = computeLayout(stackedSpec);
+    const svg = parseSvg(renderLabel(stackedSpec, font));
+
+    const [silhouette] = pathsWithAttribute(svg, 'data-hardware-icon');
+    const { left, right } = horizontalSpanOf(silhouette);
+    const { top, bottom } = verticalSpanOf(silhouette);
+    assert.ok(bottom - top > 3 * (right - left), 'the silhouette is not upright');
+    assert.ok(onCurvePointsOf(silhouette).every((point) => isInsideZone(point, iconZone)), 'the silhouette leaves the icon zone');
+  });
+
+  it('should write the dimensions one and a half times bigger than the drive size', () => {
+    const [dimensionsLine, driveLine] = placeLabelTextLines(screwSpec, font);
+
+    assert.ok(Math.abs(dimensionsLine.fontSize - 1.5 * driveLine.fontSize) < 1e-9);
+  });
+
+  it('should draw no silhouette for a hardware type that has no drawing yet', () => {
+    const svg = parseSvg(renderLabel({ ...screwSpec, hardwareType: 'hook', drive: null }, font));
+
+    assert.equal(pathsWithAttribute(svg, 'data-hardware-icon').length, 0);
   });
 
   it('should draw no drive icon when there is no drive', () => {
