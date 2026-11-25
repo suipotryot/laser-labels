@@ -23,6 +23,14 @@ describe('chooseLayout', () => {
     assert.equal(chooseLayout({ ...screwSpec, width: 20, height: 60 }, font).orientation, 'stacked');
   });
 
+  it('should favour the text over the drawing, keeping a screw beside a short text on a short label', () => {
+    assert.equal(chooseLayout({ ...screwSpec, width: 30, height: 20, dimensions: '4x30' }, font).orientation, 'sideBySide');
+  });
+
+  it('should put long dimensions above the screw, even on a wide label', () => {
+    assert.equal(chooseLayout({ ...screwSpec, drive: null, dimensions: 'M5 x 52 tête fraisée inox A2' }, font).orientation, 'stacked');
+  });
+
   it('should give the whole label to the text of a hardware type that has no drawing yet', () => {
     const { iconZone, textZone } = chooseLayout({ ...screwSpec, hardwareType: 'hook', drive: null }, font);
 

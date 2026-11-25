@@ -57,22 +57,27 @@ function middleOfCapitals(font, { fontSize, baseline }) {
   return baseline - (fontSize * capHeightPerFontSize(font)) / 2;
 }
 
-function leadingIconCircle(font, zone, placedLine) {
+function leadingIconCircle(font, lineLeft, placedLine) {
   const radius = (placedLine.fontSize * LEADING_ICON_DIAMETER_PER_FONT_SIZE) / 2;
-  return { x: zone.x + radius, y: middleOfCapitals(font, placedLine), radius };
+  return { x: lineLeft + radius, y: middleOfCapitals(font, placedLine), radius };
 }
 
-function placeLine(font, line, zone, { fontSize, baseline }) {
-  const textLeftEdge = zone.x + leadingIconAdvancePerFontSize(line) * fontSize;
+function lineLeftIn(zone, lineWidth, { centered }) {
+  return centered ? zone.x + (zone.width - lineWidth) / 2 : zone.x;
+}
+
+function placeLine(font, line, zone, { fontSize, baseline, centered }) {
+  const lineLeft = lineLeftIn(zone, lineWidthPerFontSize(font, line) * fontSize, { centered });
+  const textLeftEdge = lineLeft + leadingIconAdvancePerFontSize(line) * fontSize;
   const placedLine = { ...line, x: xStartingInkAt(font, line.text, textLeftEdge, fontSize), baseline, fontSize };
-  return hasLeadingIcon(line) ? { ...placedLine, leadingIconCircle: leadingIconCircle(font, zone, placedLine) } : placedLine;
+  return hasLeadingIcon(line) ? { ...placedLine, leadingIconCircle: leadingIconCircle(font, lineLeft, placedLine) } : placedLine;
 }
 
 function lineTopsFrom(blockTop, lineHeights) {
   return lineHeights.map((_, index) => blockTop + lineHeights.slice(0, index).reduce((sum, height) => sum + height, 0));
 }
 
-export function fitTextLines(font, lines, zone) {
+export function fitTextLines(font, lines, zone, { centered } = { centered: false }) {
   const baseFontSize = largestFittingFontSize(font, lines, zone);
   const fontSizes = lines.map((line) => baseFontSize * scaleOf(line));
   const blockTop = topOfCenteredBlock(zone, baseFontSize * blockHeightPerFontSize(font, lines));
@@ -80,5 +85,6 @@ export function fitTextLines(font, lines, zone) {
   return lines.map((line, index) => placeLine(font, line, zone, {
     fontSize: fontSizes[index],
     baseline: lineTops[index] + fontSizes[index] * fontBoxTopPerFontSize(font),
+    centered,
   }));
 }

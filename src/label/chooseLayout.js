@@ -3,6 +3,8 @@ import { listLabelLines } from './listLabelLines.js';
 import { largestFittingFontSize } from '../text/fitTextLines.js';
 import { aspectRatioOfHardwareIcon, isHardwareDrawingPending } from '../icons/hardwareIcons.js';
 
+const TEXT_WEIGHT = 2;
+
 function textSizeIn({ textZone }, lines, font) {
   return lines.length > 0 ? largestFittingFontSize(font, lines, textZone) : 1;
 }
@@ -21,7 +23,7 @@ export function chooseLayout(spec, font) {
   if (iconAspectRatio === null) {
     return computeLayout(spec, ORIENTATIONS[0], null);
   }
-  const scoreOf = (layout) => textSizeIn(layout, lines, font) * drawingHeightIn(layout, iconAspectRatio);
+  const scoreOf = (layout) => textSizeIn(layout, lines, font) ** TEXT_WEIGHT * drawingHeightIn(layout, iconAspectRatio);
   const layouts = ORIENTATIONS.map((orientation) => computeLayout(spec, orientation, iconAspectRatio));
   return layouts.reduce((best, layout) => (scoreOf(layout) > scoreOf(best) ? layout : best));
 }

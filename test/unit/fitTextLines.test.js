@@ -119,6 +119,17 @@ describe('fitTextLines', () => {
     assertWithinZoneWidth(placedLines, widthLimitingZone);
   });
 
+  it('should center every line horizontally, its leading icon included, when asked', () => {
+    const lines = [{ text: '3,5x50', scale: 1.5 }, { text: 'PZ2', leadingIcon: 'pozidriv' }];
+    const [dimensionsLine, driveLine] = fitTextLines(font, lines, zone, { centered: true });
+
+    const zoneCenter = zone.x + zone.width / 2;
+    const dimensionsInk = inkBoxOf(dimensionsLine);
+    assertAlmostEqual((dimensionsInk.left + dimensionsInk.right) / 2, zoneCenter);
+    const driveLineLeft = driveLine.leadingIconCircle.x - driveLine.leadingIconCircle.radius;
+    assertAlmostEqual((driveLineLeft + inkBoxOf(driveLine).right) / 2, zoneCenter);
+  });
+
   it('should give every unscaled line the same font size', () => {
     const placedLines = fitTextLines(font, textLines('Cheville Molly', '6x52'), zone);
 
