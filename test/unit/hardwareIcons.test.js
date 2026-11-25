@@ -1,10 +1,9 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { aspectRatioOfHardwareIcon, drawHardwareIcon, isHardwareDrawingPending, thinnestHardwareDetail } from '../../src/icons/hardwareIcons.js';
+import { aspectRatioOfHardwareIcon, drawHardwareIcon, thinnestHardwareDetail } from '../../src/icons/hardwareIcons.js';
 import { hardwareTypes } from '../../src/catalog/hardwareTypes.js';
 import { contoursOf, cornersOf, extentOf, isAlmostEqual, onCurvePointsOf, windingOf } from './helpers/geometry.js';
 
-const DRAWN_HARDWARE = ['screw', 'nail', 'bolt', 'nut', 'eyeScrew', 'hook', 'wallPlug'];
 
 function cornersAt(corners, x) {
   return corners.filter((corner) => isAlmostEqual(corner.x, x));
@@ -31,14 +30,14 @@ function directionChangesAlong(corners, edgeIsTop) {
 }
 
 describe('drawHardwareIcon', () => {
-  it('should draw an outline for the screw, the nail, the bolt and the nut', () => {
-    for (const key of DRAWN_HARDWARE) {
+  it('should draw an outline for every hardware type of the catalog', () => {
+    for (const { key } of hardwareTypes) {
       assert.ok(drawHardwareIcon(key).outline.length > 0, `no outline for ${key}`);
     }
   });
 
   it('should close every contour of the outlines and leave every stroke open', () => {
-    for (const key of DRAWN_HARDWARE) {
+    for (const { key } of hardwareTypes) {
       const { outline, strokes } = drawHardwareIcon(key);
       assert.ok(contoursOf(outline).every((contour) => contour.at(-1).type === 'Z'), `${key} has an open outline`);
       assert.ok(strokes.every(({ type }) => type !== 'Z'), `${key} has a closed stroke`);
@@ -234,6 +233,24 @@ describe('drawHardwareIcon', () => {
     assert.ok(isAlmostEqual(Math.max(split[0].x, split[1].x), extent.right), 'the split does not reach the end');
   });
 
+  it('should draw a Molly anchor lying with a head and a tall thin flange on the left, a slotted sleeve and a flat end', () => {
+    const { outline } = drawHardwareIcon('mollyAnchor');
+
+    const [body, slot, ...others] = contoursOf(outline);
+    assert.equal(others.length, 0);
+    const points = onCurvePointsOf(body);
+    const extent = extentOf(points);
+    const length = extent.right - extent.left;
+    assert.ok(length > 3 * (extent.bottom - extent.top), 'the Molly anchor is not lying');
+    const flangePoints = points.filter(({ y }) => isAlmostEqual(y, extent.top));
+    assert.ok(Math.max(...flangePoints.map(({ x }) => x)) < extent.left + length / 6, 'no flange on the left');
+    assert.ok(Math.min(...flangePoints.map(({ x }) => x)) > extent.left, 'no head before the flange');
+    assert.equal(cornersAt(points, extent.right).length, 2, 'the end is not flat');
+    assert.notEqual(windingOf(slot), windingOf(body), 'the slot would be filled');
+    const slotExtent = extentOf(onCurvePointsOf(slot));
+    assert.ok(slotExtent.right - slotExtent.left > 5 * (slotExtent.bottom - slotExtent.top), 'the slot is not long along the sleeve');
+  });
+
   it('should draw a nut seen from the front as a hexagon with a hollow round hole, without strokes', () => {
     const { outline, strokes } = drawHardwareIcon('nut');
 
@@ -243,18 +260,6 @@ describe('drawHardwareIcon', () => {
     assert.ok(hole.some(({ type }) => type === 'C'), 'the hole is not round');
     assert.notEqual(windingOf(hole), windingOf(hexagon), 'the hole would be filled');
     assert.equal(strokes.length, 0);
-  });
-});
-
-describe('isHardwareDrawingPending', () => {
-  it('should tell apart every hardware type of the catalog that still waits for its drawing from the drawn ones', () => {
-    for (const { key } of hardwareTypes) {
-      if (isHardwareDrawingPending(key)) {
-        assert.throws(() => drawHardwareIcon(key), `${key} is drawn but still listed as pending`);
-      } else {
-        assert.doesNotThrow(() => drawHardwareIcon(key), `${key} has no drawing and is not listed as pending`);
-      }
-    }
   });
 });
 
@@ -277,7 +282,7 @@ describe('thinnestHardwareDetail', () => {
 
 describe('aspectRatioOfHardwareIcon', () => {
   it('should give the width over the height of the lying drawing, strokes included', () => {
-    for (const key of DRAWN_HARDWARE) {
+    for (const { key } of hardwareTypes) {
       const { outline, strokes } = drawHardwareIcon(key);
       const extent = extentOf([...outline, ...strokes]);
 

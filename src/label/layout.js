@@ -35,8 +35,5 @@ export const ORIENTATIONS = Object.keys(SPLITS);
 export function computeLayout(size, orientation, iconAspectRatio) {
   const margin = marginFor(size);
   const inner = innerZone(size, margin);
-  if (iconAspectRatio === null) {
-    return { orientation, iconZone: null, textZone: inner };
-  }
   return { orientation, ...SPLITS[orientation](inner, margin, iconAspectRatio) };
 }

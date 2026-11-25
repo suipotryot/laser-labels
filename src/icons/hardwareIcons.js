@@ -77,6 +77,20 @@ const WALL_PLUG = {
   splitStart: 1.9,
   end: 3,
 };
+const MOLLY_ANCHOR = {
+  headRadius: 0.32,
+  headRounding: 0.12,
+  headDepth: 0.25,
+  flangeRadius: 0.5,
+  flangeEnd: 0.35,
+  sleeveRadius: 0.24,
+  slotStart: 0.9,
+  slotEnd: 2.4,
+  slotHalfWidth: 0.07,
+  coneStart: 2.9,
+  endRadius: 0.15,
+  end: 3.2,
+};
 const TOP = -1;
 const BOTTOM = 1;
 
@@ -276,6 +290,38 @@ function drawWallPlug() {
   };
 }
 
+function mollyAnchorEdge(side) {
+  return [
+    { ...atSide(0, MOLLY_ANCHOR.headRadius, side), rounding: MOLLY_ANCHOR.headRounding },
+    atSide(MOLLY_ANCHOR.headDepth, MOLLY_ANCHOR.headRadius, side),
+    atSide(MOLLY_ANCHOR.headDepth, MOLLY_ANCHOR.flangeRadius, side),
+    atSide(MOLLY_ANCHOR.flangeEnd, MOLLY_ANCHOR.flangeRadius, side),
+    atSide(MOLLY_ANCHOR.flangeEnd, MOLLY_ANCHOR.sleeveRadius, side),
+    atSide(MOLLY_ANCHOR.coneStart, MOLLY_ANCHOR.sleeveRadius, side),
+    atSide(MOLLY_ANCHOR.end, MOLLY_ANCHOR.endRadius, side),
+  ];
+}
+
+function expansionSlot() {
+  const halfWidth = MOLLY_ANCHOR.slotHalfWidth;
+  return hollow(polygonWithRoundedCorners([
+    { ...atSide(MOLLY_ANCHOR.slotStart, halfWidth, TOP), rounding: halfWidth },
+    { ...atSide(MOLLY_ANCHOR.slotEnd, halfWidth, TOP), rounding: halfWidth },
+    { ...atSide(MOLLY_ANCHOR.slotEnd, halfWidth, BOTTOM), rounding: halfWidth },
+    { ...atSide(MOLLY_ANCHOR.slotStart, halfWidth, BOTTOM), rounding: halfWidth },
+  ]));
+}
+
+function drawMollyAnchor() {
+  return {
+    outline: [...mirroredOutline(mollyAnchorEdge), ...expansionSlot()],
+    strokes: [
+      ...verticalStroke(MOLLY_ANCHOR.flangeEnd, MOLLY_ANCHOR.sleeveRadius),
+      ...verticalStroke(MOLLY_ANCHOR.coneStart, MOLLY_ANCHOR.sleeveRadius),
+    ],
+  };
+}
+
 function gapBetweenDiagonalThreads(piece) {
   const threadRise = 2 * threadReachOf(piece);
   return (piece.threadPitch * threadRise) / Math.hypot(piece.threadPitch / 2, threadRise);
@@ -285,6 +331,10 @@ const HARDWARE_DRAWINGS = {
   screw: { draw: drawScrew, thinnestDetail: Math.min(gapBetweenDiagonalThreads(SCREW), 2 * SCREW.shankRadius) },
   hook: { draw: drawHook, thinnestDetail: Math.min(gapBetweenDiagonalThreads(HOOK), 2 * HOOK.shankRadius) },
   wallPlug: { draw: drawWallPlug, thinnestDetail: Math.min(WALL_PLUG.collarDepth, WALL_PLUG.finRadius - WALL_PLUG.bodyRadius) },
+  mollyAnchor: {
+    draw: drawMollyAnchor,
+    thinnestDetail: Math.min(MOLLY_ANCHOR.flangeEnd - MOLLY_ANCHOR.headDepth, 2 * MOLLY_ANCHOR.slotHalfWidth),
+  },
   eyeScrew: {
     draw: drawEyeScrew,
     thinnestDetail: Math.min(gapBetweenDiagonalThreads(EYE_SCREW), EYE_SCREW.eyeRadius - EYE_SCREW.eyeHoleRadius),
@@ -293,12 +343,6 @@ const HARDWARE_DRAWINGS = {
   bolt: { draw: drawBolt, thinnestDetail: BOLT.chamfer },
   nut: { draw: drawNut, thinnestDetail: NUT.hexRadius * Math.cos(Math.PI / 6) - NUT.holeRadius },
 };
-
-const HARDWARE_WAITING_FOR_A_DRAWING = ['mollyAnchor'];
-
-export function isHardwareDrawingPending(hardwareTypeKey) {
-  return HARDWARE_WAITING_FOR_A_DRAWING.includes(hardwareTypeKey);
-}
 
 function hardwareDrawingOf(hardwareTypeKey) {
   if (!Object.hasOwn(HARDWARE_DRAWINGS, hardwareTypeKey)) {
