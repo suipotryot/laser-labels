@@ -1,4 +1,4 @@
-import { aspectRatioOf, circle, hollow, placeTogetherInBox, polygon, polyline, regularPolygon, solid } from './contours.js';
+import { aspectRatioOf, circle, hollow, placeTogetherInBox, polygonWithRoundedCorners, polyline, regularPolygon, solid } from './contours.js';
 
 const FLOATING_POINT_TOLERANCE = 1e-9;
 const SCREW = {
@@ -11,7 +11,17 @@ const SCREW = {
   shankEnd: 3.5,
   tipEnd: 4,
 };
-const NAIL = { headRadius: 0.5, headDepth: 0.1, shankRadius: 0.1, shankEnd: 4.2, tipEnd: 4.6 };
+const NAIL = {
+  headRadius: 0.5,
+  headDepth: 0.1,
+  headRounding: 0.04,
+  shankRadius: 0.1,
+  shankEnd: 4,
+  tipEnd: 4.7,
+  bevelStart: 3.85,
+  bevelPoint: 4.35,
+  notchCount: 6,
+};
 const BOLT = {
   headRadius: 0.55,
   faceEdgeHeight: 0.55 * Math.cos(Math.PI / 3),
@@ -31,7 +41,7 @@ function atSide(x, distanceFromAxis, side) {
 }
 
 function mirroredOutline(edgeOf, ...pointsOnAxis) {
-  return solid(polygon([...edgeOf(TOP), ...pointsOnAxis, ...edgeOf(BOTTOM).reverse()]));
+  return solid(polygonWithRoundedCorners([...edgeOf(TOP), ...pointsOnAxis, ...edgeOf(BOTTOM).reverse()]));
 }
 
 function evenlySpacedPositions({ from, to, pitch }) {
@@ -41,6 +51,10 @@ function evenlySpacedPositions({ from, to, pitch }) {
 
 function threadReachOf(piece) {
   return piece.shankRadius + piece.threadOverhang;
+}
+
+function verticalStroke(x, halfLength) {
+  return polyline([atSide(x, halfLength, TOP), atSide(x, halfLength, BOTTOM)]);
 }
 
 function screwEdge(side) {
@@ -61,20 +75,43 @@ function diagonalThreadStrokes() {
 }
 
 function drawScrew() {
-  return { outline: mirroredOutline(screwEdge, { x: SCREW.tipEnd, y: 0 }), strokes: diagonalThreadStrokes() };
+  return {
+    outline: mirroredOutline(screwEdge, { x: SCREW.tipEnd, y: 0 }),
+    strokes: [...verticalStroke(SCREW.headDepth, SCREW.shankRadius), ...diagonalThreadStrokes()],
+  };
 }
 
 function nailEdge(side) {
   return [
-    atSide(0, NAIL.headRadius, side),
-    atSide(NAIL.headDepth, NAIL.headRadius, side),
+    { ...atSide(0, NAIL.headRadius, side), rounding: NAIL.headRounding },
+    { ...atSide(NAIL.headDepth, NAIL.headRadius, side), rounding: NAIL.headRounding },
     atSide(NAIL.headDepth, NAIL.shankRadius, side),
     atSide(NAIL.shankEnd, NAIL.shankRadius, side),
   ];
 }
 
+function gripNotches() {
+  const firstThirdOfShank = (NAIL.shankEnd - NAIL.headDepth) / 3;
+  const notchSpacing = firstThirdOfShank / (NAIL.notchCount + 1);
+  const firstNotch = NAIL.headDepth + notchSpacing;
+  return evenlySpacedPositions({ from: firstNotch, to: firstNotch + (NAIL.notchCount - 1) * notchSpacing, pitch: notchSpacing })
+    .flatMap((x) => polyline([atSide(x, NAIL.shankRadius, TOP), { x, y: 0 }]));
+}
+
+function tipBevel() {
+  const bevelBend = { x: NAIL.shankEnd, y: NAIL.shankRadius / 2 };
+  return [
+    { type: 'M', ...atSide(NAIL.bevelStart, NAIL.shankRadius, TOP) },
+    { type: 'Q', x1: bevelBend.x, y1: TOP * bevelBend.y, x: NAIL.bevelPoint, y: 0 },
+    { type: 'Q', x1: bevelBend.x, y1: BOTTOM * bevelBend.y, ...atSide(NAIL.bevelStart, NAIL.shankRadius, BOTTOM) },
+  ];
+}
+
 function drawNail() {
-  return { outline: mirroredOutline(nailEdge, { x: NAIL.tipEnd, y: 0 }), strokes: [] };
+  return {
+    outline: mirroredOutline(nailEdge, { x: NAIL.tipEnd, y: 0 }),
+    strokes: [...verticalStroke(NAIL.headDepth, NAIL.shankRadius), ...gripNotches(), ...tipBevel()],
+  };
 }
 
 function boltEdge(side) {
@@ -86,10 +123,6 @@ function boltEdge(side) {
     atSide(BOLT.length - BOLT.chamfer, BOLT.shankRadius, side),
     atSide(BOLT.length, BOLT.shankRadius - BOLT.chamfer, side),
   ];
-}
-
-function verticalStroke(x, halfLength) {
-  return polyline([atSide(x, halfLength, TOP), atSide(x, halfLength, BOTTOM)]);
 }
 
 function hexHeadStrokes() {

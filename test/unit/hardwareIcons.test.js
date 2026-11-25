@@ -2,12 +2,17 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { aspectRatioOfHardwareIcon, drawHardwareIcon, isHardwareDrawingPending, thinnestHardwareDetail } from '../../src/icons/hardwareIcons.js';
 import { hardwareTypes } from '../../src/catalog/hardwareTypes.js';
-import { contoursOf, cornersOf, extentOf, isAlmostEqual, windingOf } from './helpers/geometry.js';
+import { contoursOf, cornersOf, extentOf, isAlmostEqual, onCurvePointsOf, windingOf } from './helpers/geometry.js';
 
 const DRAWN_HARDWARE = ['screw', 'nail', 'bolt', 'nut'];
 
 function cornersAt(corners, x) {
   return corners.filter((corner) => isAlmostEqual(corner.x, x));
+}
+
+function shankStartOf(points) {
+  const shankRadius = Math.min(...points.filter(({ y }) => y < 0).map(({ y }) => -y));
+  return Math.min(...points.filter(({ y }) => isAlmostEqual(y, -shankRadius)).map(({ x }) => x));
 }
 
 function strokesOf(commands) {
@@ -64,29 +69,88 @@ describe('drawHardwareIcon', () => {
     assert.ok(isAlmostEqual(tip[0].y, 0), 'the tip is not on the axis');
     assert.equal(directionChangesAlong(corners, true), 0, 'the top edge is not straight');
     const shankRadius = Math.min(...corners.filter(({ y }) => y < 0).map(({ y }) => -y));
-    const threads = strokesOf(strokes);
+    const threads = strokesOf(strokes).filter(([start, end]) => !isAlmostEqual(start.x, end.x));
     assert.ok(threads.length > 5, 'no thread strokes');
     for (const [start, end] of threads) {
-      assert.ok(start.x !== end.x, 'a thread stroke is not diagonal');
       assert.ok(Math.abs(start.y) > shankRadius && Math.abs(end.y) > shankRadius, 'a thread stroke does not cross the edges');
     }
   });
 
-  it('should draw a nail lying with a flat thin head on the left and a pointed tip, without strokes', () => {
-    const { outline, strokes } = drawHardwareIcon('nail');
+  it('should draw a line across the shank where the head of the screw ends', () => {
+    const { outline, strokes } = drawHardwareIcon('screw');
+
+    const corners = cornersOf(contoursOf(outline)[0]);
+    const shankCorners = corners.filter(({ y }) => y < 0 && !isAlmostEqual(y, extentOf(corners).top));
+    const headEnd = Math.min(...shankCorners.map(({ x }) => x));
+    const shankRadius = -shankCorners[0].y;
+    const lineAtHeadEnd = strokesOf(strokes).find(([start, end]) => isAlmostEqual(start.x, headEnd) && isAlmostEqual(end.x, headEnd));
+    assert.ok(lineAtHeadEnd, 'no line where the head ends');
+    assert.ok(isAlmostEqual(Math.abs(lineAtHeadEnd[1].y - lineAtHeadEnd[0].y), 2 * shankRadius), 'the line does not span exactly the shank');
+  });
+
+  it('should draw a nail lying with a flat thin head on the left and a pointed tip', () => {
+    const { outline } = drawHardwareIcon('nail');
 
     const [contour, ...others] = contoursOf(outline);
     assert.equal(others.length, 0);
-    const corners = cornersOf(contour);
-    const extent = extentOf(corners);
+    const points = onCurvePointsOf(contour);
+    const extent = extentOf(points);
     const length = extent.right - extent.left;
     assert.ok(length > 3 * (extent.bottom - extent.top), 'the nail is not lying');
-    const headCorners = corners.filter(({ y }) => isAlmostEqual(y, extent.top) || isAlmostEqual(y, extent.bottom));
-    assert.ok(extentOf(headCorners).right - extent.left < length / 10, 'the head is not thin');
-    const tip = cornersAt(corners, extent.right);
+    const headPoints = points.filter(({ y }) => isAlmostEqual(y, extent.top) || isAlmostEqual(y, extent.bottom));
+    assert.ok(extentOf(headPoints).right - extent.left < length / 10, 'the head is not thin');
+    const tip = cornersAt(points, extent.right);
     assert.equal(tip.length, 1);
     assert.ok(isAlmostEqual(tip[0].y, 0), 'the tip is not on the axis');
-    assert.equal(strokes.length, 0);
+  });
+
+  it('should draw a line across the shank where the head of the nail ends', () => {
+    const { outline, strokes } = drawHardwareIcon('nail');
+
+    const points = onCurvePointsOf(contoursOf(outline)[0]);
+    const shankRadius = Math.min(...points.filter(({ y }) => y < 0).map(({ y }) => -y));
+    const headEnd = shankStartOf(points);
+    const lineAtHeadEnd = strokesOf(strokes).find(([start, end]) => isAlmostEqual(start.x, headEnd) && isAlmostEqual(end.x, headEnd));
+    assert.ok(lineAtHeadEnd, 'no line where the head ends');
+    assert.ok(isAlmostEqual(Math.abs(lineAtHeadEnd[1].y - lineAtHeadEnd[0].y), 2 * shankRadius), 'the line does not span exactly the shank');
+  });
+
+  it('should round the four corners of the nail head', () => {
+    const { outline } = drawHardwareIcon('nail');
+
+    const contour = contoursOf(outline)[0];
+    const extent = extentOf(onCurvePointsOf(contour));
+    const roundedHeadCorners = contour.filter(({ type, y1 }) => type === 'Q' && (isAlmostEqual(y1, extent.top) || isAlmostEqual(y1, extent.bottom)));
+    assert.equal(roundedHeadCorners.length, 4);
+  });
+
+  it('should draw a curved bevel in the shape of a V inside the tip of the nail', () => {
+    const { outline, strokes } = drawHardwareIcon('nail');
+
+    const points = onCurvePointsOf(contoursOf(outline)[0]);
+    const tipEnd = extentOf(points).right;
+    const shankRadius = Math.min(...points.filter(({ y }) => y < 0).map(({ y }) => -y));
+    const bevel = contoursOf(strokes).find((stroke) => stroke.some(({ type }) => type === 'Q'));
+    assert.ok(bevel, 'no curved bevel');
+    const [start, ...rest] = bevel;
+    const end = rest.at(-1);
+    const pointOfTheV = rest.find(({ y }) => isAlmostEqual(y, 0));
+    assert.ok(isAlmostEqual(start.y, -shankRadius) && isAlmostEqual(end.y, shankRadius), 'the bevel does not start and end on the edges');
+    assert.ok(pointOfTheV && pointOfTheV.x > start.x && pointOfTheV.x < tipEnd, 'the bevel does not point towards the tip');
+  });
+
+  it('should draw six short notches on one side of the first third of the nail shank', () => {
+    const { outline, strokes } = drawHardwareIcon('nail');
+
+    const points = onCurvePointsOf(contoursOf(outline)[0]);
+    const shankRadius = Math.min(...points.filter(({ y }) => y < 0).map(({ y }) => -y));
+    const headEnd = shankStartOf(points);
+    const shankEnd = Math.max(...points.filter(({ y }) => isAlmostEqual(y, -shankRadius)).map(({ x }) => x));
+    const firstThirdEnd = headEnd + (shankEnd - headEnd) / 3;
+    const straightStrokes = strokesOf(strokes).filter((stroke) => stroke.length === 2);
+    const notches = straightStrokes.filter(([start, end]) => isAlmostEqual(start.y, -shankRadius) && end.y > start.y && end.y < shankRadius);
+    assert.equal(notches.length, 6);
+    assert.ok(notches.every(([start]) => start.x > headEnd && start.x < firstThirdEnd), 'a notch is outside the first third of the shank');
   });
 
   it('should draw a bolt lying with a hexagonal head on the left, a flat end and straight threads along all its shank', () => {
@@ -141,11 +205,10 @@ describe('isHardwareDrawingPending', () => {
 
 describe('thinnestHardwareDetail', () => {
   it('should give the thickness of the head of a nail', () => {
-    const corners = cornersOf(contoursOf(drawHardwareIcon('nail').outline)[0]);
-    const extent = extentOf(corners);
-    const headCorners = corners.filter(({ y }) => isAlmostEqual(y, extent.top));
+    const points = onCurvePointsOf(contoursOf(drawHardwareIcon('nail').outline)[0]);
+    const extent = extentOf(points);
 
-    assert.ok(isAlmostEqual(thinnestHardwareDetail('nail'), extentOf(headCorners).right - extent.left));
+    assert.ok(isAlmostEqual(thinnestHardwareDetail('nail'), shankStartOf(points) - extent.left));
   });
 
   it('should give the width of the chamfer of the head of a bolt', () => {

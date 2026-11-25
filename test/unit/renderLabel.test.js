@@ -180,7 +180,7 @@ describe('renderLabel', () => {
   });
 
   it('should draw no strokes path for hardware without strokes', () => {
-    const svg = parseSvg(renderLabel({ ...screwSpec, hardwareType: 'nail', drive: null }, font));
+    const svg = parseSvg(renderLabel({ ...screwSpec, hardwareType: 'nut', drive: null }, font));
 
     assert.equal(pathsWithAttribute(svg, 'data-hardware-outline').length, 1);
     assert.equal(pathsWithAttribute(svg, 'data-hardware-strokes').length, 0);

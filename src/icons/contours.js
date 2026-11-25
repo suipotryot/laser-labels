@@ -10,6 +10,25 @@ export function polygon(corners) {
   return [...polyline(corners), { type: 'Z' }];
 }
 
+function towards(from, to, distance) {
+  const length = Math.hypot(to.x - from.x, to.y - from.y);
+  return { x: from.x + ((to.x - from.x) * distance) / length, y: from.y + ((to.y - from.y) * distance) / length };
+}
+
+function cornerSegments(corner, previous, next) {
+  if (!corner.rounding) {
+    return [{ type: 'L', x: corner.x, y: corner.y }];
+  }
+  const entry = towards(corner, previous, corner.rounding);
+  const exit = towards(corner, next, corner.rounding);
+  return [{ type: 'L', ...entry }, { type: 'Q', x1: corner.x, y1: corner.y, x: exit.x, y: exit.y }];
+}
+
+export function polygonWithRoundedCorners(corners) {
+  const [first, ...others] = corners.flatMap((corner, index) => cornerSegments(corner, corners.at(index - 1), corners[(index + 1) % corners.length]));
+  return [{ type: 'M', x: first.x, y: first.y }, ...others, { type: 'Z' }];
+}
+
 export function rectangle({ halfWidth, halfHeight }) {
   return polygon([
     { x: -halfWidth, y: -halfHeight },
