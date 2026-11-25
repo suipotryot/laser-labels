@@ -125,7 +125,7 @@ test.describe('preview', () => {
     await page.getByLabel('Largeur (mm)').fill('abc');
     await page.locator('#error-message').evaluate((errorMessage) => {
       globalThis.errorMessageChanges = 0;
-      new MutationObserver((changes) => {
+      new globalThis.MutationObserver((changes) => {
         globalThis.errorMessageChanges += changes.length;
       }).observe(errorMessage, { childList: true, characterData: true, subtree: true });
     });
