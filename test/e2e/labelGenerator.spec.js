@@ -126,6 +126,18 @@ test.describe('generate button', () => {
     }
   });
 
+  test('should still preview a label whose text is too small to read, with a notice', async ({ page }) => {
+    await page.getByLabel('Largeur (mm)').fill('20');
+    await page.getByLabel('Hauteur (mm)').fill('10');
+    await page.getByLabel('Type de quincaillerie').selectOption({ label: 'Cheville Molly' });
+    await page.getByLabel('Dimensions de la pièce').fill('6x52');
+
+    await generate(page);
+
+    expect(await textLinesOf(page)).toEqual(['Cheville Molly', '6x52']);
+    await expect(page.getByText('Le texte est très petit : il risque d\'être illisible une fois gravé.')).toBeVisible();
+  });
+
   test('should stay disabled and explain why when the font fails to load', async ({ page }) => {
     await page.addInitScript(() => {
       globalThis.fetch = () => Promise.reject(new Error('Network down'));

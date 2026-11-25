@@ -1,6 +1,4 @@
-import { computeLayout } from './layout.js';
-import { listLabelLines } from './listLabelLines.js';
-import { fitTextLines } from '../text/fitTextLines.js';
+import { placeLabelTextLines } from './placeLabelTextLines.js';
 import { outlineTextLine } from '../text/outlineTextLine.js';
 import { svgMarkup } from '../svg/svgMarkup.js';
 import { toSvgPathData } from '../svg/pathData.js';
@@ -24,8 +22,8 @@ function renderTextLine(font, placedLine) {
   return `<path aria-label="${escapeXml(placedLine.text)}" d="${pathData}"/>`;
 }
 
-function renderTextLines(font, lines, zone) {
-  return fitTextLines(font, lines, zone)
+function renderTextLines(spec, font) {
+  return placeLabelTextLines(spec, font)
     .map((placedLine) => renderTextLine(font, placedLine))
     .join('');
 }
@@ -35,7 +33,5 @@ function renderSvg({ width, height }, content) {
 }
 
 export function renderLabel(spec, font) {
-  const { textZone } = computeLayout(spec);
-  const content = renderOptionalFrame(spec) + renderTextLines(font, listLabelLines(spec), textZone);
-  return renderSvg(spec, content);
+  return renderSvg(spec, renderOptionalFrame(spec) + renderTextLines(spec, font));
 }
