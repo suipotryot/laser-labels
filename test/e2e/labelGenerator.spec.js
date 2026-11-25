@@ -212,6 +212,14 @@ test.describe('drive type select', () => {
     ]);
   });
 
+  test('should offer the usual tamper resistant Torx sizes', async ({ page }) => {
+    await page.getByLabel("Type d'empreinte").selectOption({ label: 'Torx inviolable' });
+
+    await expect(page.getByLabel("Taille d'empreinte").locator('option')).toHaveText([
+      'T8H', 'T9H', 'T10H', 'T15H', 'T20H', 'T25H', 'T27H', 'T30H', 'T40H', 'T45H', 'T50H',
+    ]);
+  });
+
   test('should offer no size when no drive is chosen', async ({ page }) => {
     await page.getByLabel("Type d'empreinte").selectOption({ label: 'Torx' });
 

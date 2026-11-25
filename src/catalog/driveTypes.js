@@ -19,7 +19,7 @@ export const driveTypes = [
   {
     key: 'torxTamperResistant',
     name: 'Torx inviolable',
-    sizes: ['T10H', 'T15H', 'T20H', 'T25H', 'T27H', 'T30H', 'T40H'],
+    sizes: ['T8H', 'T9H', 'T10H', 'T15H', 'T20H', 'T25H', 'T27H', 'T30H', 'T40H', 'T45H', 'T50H'],
   },
   {
     key: 'hexSocket',
