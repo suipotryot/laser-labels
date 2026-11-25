@@ -68,15 +68,15 @@ function readDrive(fields, hardwareType) {
   return { type: driveType.key, size: readDriveSize(fields, driveType) };
 }
 
-const INVISIBLE_CHARACTERS = /\p{C}/u;
-const COMBINING_MARK = /\p{M}/u;
+const NON_PRINTABLE_CHARACTERS = /\p{C}/u;
+const STANDALONE_ACCENT = /\p{M}/u;
 
-function canBeEngraved(font, character) {
-  return font.hasChar(character) && !COMBINING_MARK.test(character);
+function isEngravable(font, character) {
+  return font.hasChar(character) && !STANDALONE_ACCENT.test(character);
 }
 
-function listUnsupportedCharacters(font, text) {
-  return [...new Set(text)].filter((character) => !canBeEngraved(font, character));
+function listUnengravableCharacters(font, text) {
+  return [...new Set(text)].filter((character) => !isEngravable(font, character));
 }
 
 const ANY_KIND_OF_SPACE = /\p{Zs}/gu;
@@ -87,21 +87,21 @@ function normalizeTypedText(text) {
 
 const MAXIMUM_DIMENSIONS_LENGTH = 40;
 
-function isTooLong(text) {
+function exceedsDimensionsLength(text) {
   return [...text].length > MAXIMUM_DIMENSIONS_LENGTH;
 }
 
 function readDimensions(fields, font) {
   const dimensions = normalizeTypedText(fields.dimensions);
-  if (isTooLong(dimensions)) {
+  if (exceedsDimensionsLength(dimensions)) {
     throw new LabelSpecError('dimensions', 'tooLong');
   }
-  if (INVISIBLE_CHARACTERS.test(dimensions)) {
-    throw new LabelSpecError('dimensions', 'invalidCharacters');
+  if (NON_PRINTABLE_CHARACTERS.test(dimensions)) {
+    throw new LabelSpecError('dimensions', 'nonPrintableCharacters');
   }
-  const unsupportedCharacters = listUnsupportedCharacters(font, dimensions);
-  if (unsupportedCharacters.length > 0) {
-    throw new LabelSpecError('dimensions', 'unsupportedCharacters', { characters: unsupportedCharacters });
+  const unengravableCharacters = listUnengravableCharacters(font, dimensions);
+  if (unengravableCharacters.length > 0) {
+    throw new LabelSpecError('dimensions', 'unengravableCharacters', { characters: unengravableCharacters });
   }
   return dimensions;
 }

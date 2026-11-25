@@ -11,7 +11,7 @@ describe('describeLabelSpecError', () => {
   });
 
   it('should list the characters that cannot be engraved', () => {
-    const error = new LabelSpecError('dimensions', 'unsupportedCharacters', { characters: ['⌀', '→'] });
+    const error = new LabelSpecError('dimensions', 'unengravableCharacters', { characters: ['⌀', '→'] });
 
     assert.equal(describeLabelSpecError(error), 'Ces caractères ne peuvent pas être gravés : ⌀ →');
   });
@@ -33,8 +33,8 @@ describe('describeLabelSpecError', () => {
       ['driveType', 'unknown'],
       ['driveSize', 'unknown'],
       ['dimensions', 'tooLong'],
-      ['dimensions', 'invalidCharacters'],
-      ['dimensions', 'unsupportedCharacters', { characters: ['→'] }],
+      ['dimensions', 'nonPrintableCharacters'],
+      ['dimensions', 'unengravableCharacters', { characters: ['→'] }],
     ];
 
     for (const [field, reason, details] of raisableErrors) {

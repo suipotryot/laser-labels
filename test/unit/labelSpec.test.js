@@ -123,7 +123,7 @@ describe('readLabelSpec', () => {
   it('should reject part dimensions containing control characters', () => {
     assert.throws(
       () => readLabelSpec({ ...validFields, dimensions: '3,5x50' }, font),
-      { name: 'LabelSpecError', field: 'dimensions', reason: 'invalidCharacters' },
+      { name: 'LabelSpecError', field: 'dimensions', reason: 'nonPrintableCharacters' },
     );
   });
 
@@ -138,14 +138,14 @@ describe('readLabelSpec', () => {
   it('should reject part dimensions containing invisible formatting characters', () => {
     assert.throws(
       () => readLabelSpec({ ...validFields, dimensions: '​3,5x50﻿' }, font),
-      { name: 'LabelSpecError', field: 'dimensions', reason: 'invalidCharacters' },
+      { name: 'LabelSpecError', field: 'dimensions', reason: 'nonPrintableCharacters' },
     );
   });
 
   it('should reject part dimensions with characters missing from the font', () => {
     assert.throws(
       () => readLabelSpec({ ...validFields, dimensions: '⌀6 → 8' }, font),
-      { name: 'LabelSpecError', field: 'dimensions', reason: 'unsupportedCharacters', characters: ['⌀', '→'] },
+      { name: 'LabelSpecError', field: 'dimensions', reason: 'unengravableCharacters', characters: ['⌀', '→'] },
     );
   });
 
@@ -164,7 +164,7 @@ describe('readLabelSpec', () => {
   it('should reject part dimensions with an accent the font cannot draw on its letter', () => {
     assert.throws(
       () => readLabelSpec({ ...validFields, dimensions: 'j\u0301' }, font),
-      { name: 'LabelSpecError', field: 'dimensions', reason: 'unsupportedCharacters' },
+      { name: 'LabelSpecError', field: 'dimensions', reason: 'unengravableCharacters' },
     );
   });
 });

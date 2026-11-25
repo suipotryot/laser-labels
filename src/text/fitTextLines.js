@@ -29,7 +29,7 @@ function fontBoxTopPerFontSize(font) {
   return font.tables.head.yMax / font.unitsPerEm;
 }
 
-function inkAlignedOnZoneLeft(font, text, zone, fontSize) {
+function xAligningInkOnZoneLeft(font, text, zone, fontSize) {
   return zone.x - inkSpanPerFontSize(font, text).left * fontSize;
 }
 
@@ -40,7 +40,7 @@ export function fitTextLines(font, lines, zone) {
   const firstBaseline = blockTop + fontSize * fontBoxTopPerFontSize(font);
   return lines.map((text, index) => ({
     text,
-    x: inkAlignedOnZoneLeft(font, text, zone, fontSize),
+    x: xAligningInkOnZoneLeft(font, text, zone, fontSize),
     baseline: firstBaseline + lineBoxHeight * index,
     fontSize,
   }));

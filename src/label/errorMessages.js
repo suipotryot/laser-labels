@@ -15,8 +15,8 @@ const errorMessages = {
   driveSize: { unknown: "Cette taille ne correspond pas au type d'empreinte choisi." },
   dimensions: {
     tooLong: 'Les dimensions ne doivent pas dépasser 40 caractères.',
-    invalidCharacters: 'Les dimensions contiennent des caractères invisibles non gravables.',
-    unsupportedCharacters: ({ characters }) => `Ces caractères ne peuvent pas être gravés : ${characters.join(' ')}`,
+    nonPrintableCharacters: 'Les dimensions contiennent des caractères invisibles non gravables.',
+    unengravableCharacters: ({ characters }) => `Ces caractères ne peuvent pas être gravés : ${characters.join(' ')}`,
   },
 };
 
