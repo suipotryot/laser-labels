@@ -4,6 +4,7 @@ import { DOMParser } from '@xmldom/xmldom';
 import { renderLabel } from '../../src/label/renderLabel.js';
 import { computeLayout } from '../../src/label/layout.js';
 import { loadTestFont } from './helpers/loadTestFont.js';
+import { placeLabelTextLines } from '../../src/label/placeLabelTextLines.js';
 
 const font = loadTestFont();
 
@@ -55,6 +56,15 @@ function textPathOf(svg, text) {
 function horizontalSpanOf(path) {
   const xs = onCurvePointsOf(path).map(({ x }) => x);
   return { left: Math.min(...xs), right: Math.max(...xs) };
+}
+
+function verticalSpanOf(path) {
+  const ys = onCurvePointsOf(path).map(({ y }) => y);
+  return { top: Math.min(...ys), bottom: Math.max(...ys) };
+}
+
+function roundToMicrometer(millimeters) {
+  return Math.round(millimeters * 1000) / 1000;
 }
 
 function isInsideZone(point, zone) {
@@ -113,6 +123,16 @@ describe('renderLabel', () => {
     for (const point of driveIconPathsOf(svg).flatMap(onCurvePointsOf)) {
       assert.ok(isInsideZone(point, textZone), `(${point.x}, ${point.y}) is outside the text zone`);
     }
+  });
+
+  it('should draw the drive icon at the size of the circle it was given', () => {
+    const svg = parseSvg(renderLabel(screwSpec, font));
+    const [, driveLine] = placeLabelTextLines(screwSpec, font);
+
+    const { x, y, radius } = driveLine.leadingIconCircle;
+    const [driveIcon] = driveIconPathsOf(svg);
+    assert.deepEqual(horizontalSpanOf(driveIcon), { left: roundToMicrometer(x - radius), right: roundToMicrometer(x + radius) });
+    assert.deepEqual(verticalSpanOf(driveIcon), { top: roundToMicrometer(y - radius), bottom: roundToMicrometer(y + radius) });
   });
 
   it('should draw no drive icon when there is no drive', () => {

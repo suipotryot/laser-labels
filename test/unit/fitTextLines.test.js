@@ -7,6 +7,7 @@ const font = loadTestFont();
 const zone = { x: 10, y: 2, width: 40, height: 16 };
 const widthLimitingZone = { ...zone, width: 20 };
 const FLOATING_POINT_TOLERANCE = 1e-9;
+const linesEndingWithDriveIcon = [{ text: '3,5x50' }, { text: 'PZ2', leadingIcon: 'pozidriv' }];
 
 function textLines(...texts) {
   return texts.map((text) => ({ text }));
@@ -67,21 +68,27 @@ describe('fitTextLines', () => {
   });
 
   it('should place a leading icon on the left edge of the zone, centered on the capitals of its line', () => {
-    const lines = [{ text: '3,5x50' }, { text: 'PZ2', leadingIcon: 'pozidriv' }];
-    const [, iconLine] = fitTextLines(font, lines, zone);
+    const [, iconLine] = fitTextLines(font, linesEndingWithDriveIcon, zone);
 
-    const { x, y, radius } = iconLine.iconCircle;
+    const { x, y, radius } = iconLine.leadingIconCircle;
     const capHeight = (iconLine.fontSize * font.tables.os2.sCapHeight) / font.unitsPerEm;
     assertAlmostEqual(x - radius, zone.x);
     assertAlmostEqual(y, iconLine.baseline - capHeight / 2);
   });
 
-  it('should start the text of a line after its leading icon, leaving a gap', () => {
-    const lines = [{ text: '3,5x50' }, { text: 'PZ2', leadingIcon: 'pozidriv' }];
-    const [, iconLine] = fitTextLines(font, lines, zone);
+  it('should start the text of a line after its leading icon, leaving a gap of 0.3 em', () => {
+    const [, iconLine] = fitTextLines(font, linesEndingWithDriveIcon, zone);
 
-    const { x, radius } = iconLine.iconCircle;
-    assert.ok(inkBoxOf(iconLine).left > x + radius, 'the text overlaps the icon');
+    const { x, radius } = iconLine.leadingIconCircle;
+    assertAlmostEqual(inkBoxOf(iconLine).left - (x + radius), 0.3 * iconLine.fontSize);
+  });
+
+  it('should keep a leading icon within the zone height when its line fills it alone', () => {
+    const [iconLine] = fitTextLines(font, [{ text: 'PZ2', leadingIcon: 'pozidriv' }], zone);
+
+    const { y, radius } = iconLine.leadingIconCircle;
+    assert.ok(y - radius >= zone.y, 'the icon starts above the zone');
+    assert.ok(y + radius <= zone.y + zone.height, 'the icon ends below the zone');
   });
 
   it('should keep a line with a leading icon within the zone width', () => {

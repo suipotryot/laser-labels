@@ -3,8 +3,8 @@ import { listLabelLines } from './listLabelLines.js';
 
 const FORBIDDEN_FILE_NAME_CHARACTERS = /[\\/:*?"<>|]/g;
 
-function toFileNamePart(line) {
-  return line.replace(FORBIDDEN_FILE_NAME_CHARACTERS, '').trim().replace(/\s+/g, '-');
+function toFileNamePart(text) {
+  return text.replace(FORBIDDEN_FILE_NAME_CHARACTERS, '').trim().replace(/\s+/g, '-');
 }
 
 function listFileNameParts(spec) {

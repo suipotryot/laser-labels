@@ -3,6 +3,9 @@ import assert from 'node:assert/strict';
 import { drawDriveIcon } from '../../src/icons/driveIcons.js';
 import { driveTypes } from '../../src/catalog/driveTypes.js';
 
+const FLOATING_POINT_TOLERANCE = 1e-9;
+const PIN_MAXIMUM_RADIUS = 0.3;
+
 function contoursOf(commands) {
   const contours = [];
   for (const command of commands) {
@@ -23,27 +26,74 @@ function cornersOf(contour) {
   return contour.filter((command) => command.type === 'M' || command.type === 'L');
 }
 
+function onCurvePointsOf(contour) {
+  return contour.filter((command) => command.type !== 'Z');
+}
+
 function sizeOf(contour) {
   const xs = cornersOf(contour).map((corner) => corner.x);
   const ys = cornersOf(contour).map((corner) => corner.y);
   return { width: Math.max(...xs) - Math.min(...xs), height: Math.max(...ys) - Math.min(...ys) };
 }
 
-function signedAreaOf(contour) {
-  const points = contour.filter((command) => command.type !== 'Z');
-  return points.reduce((area, point, index) => {
+function windingOf(contour) {
+  const points = onCurvePointsOf(contour);
+  const signedArea = points.reduce((area, point, index) => {
     const next = points[(index + 1) % points.length];
     return area + (point.x * next.y - next.x * point.y) / 2;
   }, 0);
+  return signedArea > 0 ? 'clockwise' : 'counterclockwise';
 }
 
-function midpointOf(from, to) {
-  return { x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 };
+function distanceFromCenter({ x, y }) {
+  return Math.hypot(x, y);
+}
+
+function distanceBetween(from, to) {
+  return Math.hypot(to.x - from.x, to.y - from.y);
+}
+
+function isAlmostEqual(actual, expected) {
+  return Math.abs(actual - expected) < FLOATING_POINT_TOLERANCE;
 }
 
 function isUnchangedByQuarterTurn(corners) {
   const quarterTurned = corners.map(({ x, y }) => ({ x: -y, y: x }));
-  return quarterTurned.every((turned) => corners.some(({ x, y }) => Math.hypot(x - turned.x, y - turned.y) < 1e-9));
+  return quarterTurned.every((turned) => corners.some((corner) => distanceBetween(corner, turned) < FLOATING_POINT_TOLERANCE));
+}
+
+function isTipCorner(corner, corners) {
+  return distanceFromCenter(corner) > Math.max(...corners.map(distanceFromCenter)) / 2;
+}
+
+function nearestOf(corner, candidates) {
+  return candidates
+    .filter((candidate) => candidate !== corner)
+    .reduce((nearest, candidate) => (distanceBetween(corner, candidate) < distanceBetween(corner, nearest) ? candidate : nearest));
+}
+
+function armTipsOf(corners) {
+  const tipCorners = corners.filter((corner) => isTipCorner(corner, corners));
+  return tipCorners.map((corner) => {
+    const otherSideOfTheTip = nearestOf(corner, tipCorners);
+    return {
+      width: distanceBetween(corner, otherSideOfTheTip),
+      center: { x: (corner.x + otherSideOfTheTip.x) / 2, y: (corner.y + otherSideOfTheTip.y) / 2 },
+    };
+  });
+}
+
+function rootWidthOf(corners) {
+  const rootCorners = corners.filter((corner) => !isTipCorner(corner, corners));
+  return Math.min(...rootCorners.map((corner) => distanceBetween(corner, nearestOf(corner, rootCorners))));
+}
+
+function isOnDiagonal({ x, y }) {
+  return isAlmostEqual(Math.abs(x), Math.abs(y));
+}
+
+function isOnAxis({ x, y }) {
+  return isAlmostEqual(x, 0) || isAlmostEqual(y, 0);
 }
 
 describe('drawDriveIcon', () => {
@@ -59,24 +109,21 @@ describe('drawDriveIcon', () => {
 
   it('should wind the recess opposite to the head so that it stays hollow once filled', () => {
     for (const { key } of driveTypes) {
-      const [head, ...recess] = contoursOf(drawDriveIcon(key));
-      const recessWithoutPin = key === 'torxTamperResistant' ? recess.slice(0, 1) : recess;
-      for (const recessContour of recessWithoutPin) {
-        assert.ok(Math.sign(signedAreaOf(recessContour)) === -Math.sign(signedAreaOf(head)), `${key} recess winds like the head`);
-      }
+      const [head, recess] = contoursOf(drawDriveIcon(key));
+      assert.notEqual(windingOf(recess), windingOf(head), `${key} recess winds like the head`);
     }
   });
 
   it('should wind the pin of a tamper resistant Torx like the head so that it stays solid once filled', () => {
     const [head, , pin] = contoursOf(drawDriveIcon('torxTamperResistant'));
 
-    assert.equal(Math.sign(signedAreaOf(pin)), Math.sign(signedAreaOf(head)));
+    assert.equal(windingOf(pin), windingOf(head));
   });
 
   it('should keep every icon within the unit circle of the head', () => {
     for (const { key } of driveTypes) {
-      for (const command of drawDriveIcon(key).filter((command) => command.type !== 'Z')) {
-        assert.ok(Math.hypot(command.x, command.y) <= 1 + 1e-9, `${key} goes past the head`);
+      for (const point of onCurvePointsOf(drawDriveIcon(key))) {
+        assert.ok(distanceFromCenter(point) <= 1 + FLOATING_POINT_TOLERANCE, `${key} goes past the head`);
       }
     }
   });
@@ -111,9 +158,8 @@ describe('drawDriveIcon', () => {
     assert.equal(recess.length, 1);
     const corners = cornersOf(recess[0]);
     assert.equal(corners.length, 6);
-    const distancesFromCenter = corners.map(({ x, y }) => Math.hypot(x, y));
-    for (const distance of distancesFromCenter) {
-      assert.ok(Math.abs(distance - distancesFromCenter[0]) < 1e-9);
+    for (const corner of corners) {
+      assert.ok(isAlmostEqual(distanceFromCenter(corner), distanceFromCenter(corners[0])));
     }
   });
 
@@ -124,8 +170,9 @@ describe('drawDriveIcon', () => {
     const corners = cornersOf(recess[0]);
     assert.equal(corners.length, 12);
     assert.ok(isUnchangedByQuarterTurn(corners));
-    const [tipLeft, tipRight, innerCorner] = corners;
-    assert.ok(Math.abs(tipRight.x - tipLeft.x) < 2 * Math.abs(innerCorner.x), 'arms do not narrow to their tip');
+    for (const tip of armTipsOf(corners)) {
+      assert.ok(tip.width < rootWidthOf(corners), 'arms do not narrow to their tip');
+    }
   });
 
   it('should draw a single contour joining a straight cross and a thinner diagonal cross for a Pozidriv drive', () => {
@@ -133,26 +180,25 @@ describe('drawDriveIcon', () => {
 
     assert.equal(recess.length, 1);
     const corners = cornersOf(recess[0]);
-    assert.equal(corners.length, 24);
     assert.ok(isUnchangedByQuarterTurn(corners));
-    const arms = Array.from({ length: 8 }, (_, index) => {
-      const [tipStart, tipEnd] = corners.slice(3 * index, 3 * index + 2);
-      return { width: Math.hypot(tipEnd.x - tipStart.x, tipEnd.y - tipStart.y), tipCenter: midpointOf(tipStart, tipEnd) };
-    });
-    const [straightArm, diagonalArm] = arms;
-    assert.ok(diagonalArm.width < straightArm.width, 'diagonal cross is not thinner');
-    assert.ok(Math.abs(Math.abs(diagonalArm.tipCenter.x) - Math.abs(diagonalArm.tipCenter.y)) < 1e-9, 'second cross is not diagonal');
+    const tips = armTipsOf(corners);
+    const widestTip = Math.max(...tips.map(({ width }) => width));
+    const straightArmTips = tips.filter(({ width }) => isAlmostEqual(width, widestTip));
+    const diagonalArmTips = tips.filter(({ width }) => width < widestTip);
+    assert.equal(straightArmTips.length + diagonalArmTips.length, 2 * 8);
+    assert.ok(straightArmTips.every(({ center }) => isOnAxis(center)), 'the wide cross is not straight');
+    assert.ok(diagonalArmTips.every(({ center }) => isOnDiagonal(center)), 'the thin cross is not diagonal');
   });
 
   it('should draw a single star with six rounded lobes for a Torx drive', () => {
     const recess = recessOf('torx');
 
     assert.equal(recess.length, 1);
-    const [start, ...curves] = recess[0].filter((command) => command.type !== 'Z');
+    const [start, ...curves] = onCurvePointsOf(recess[0]);
     assert.equal(start.type, 'M');
     assert.ok(curves.every((command) => command.type === 'Q'), 'lobes are not rounded');
     const controlDistances = curves.map(({ x1, y1 }) => Math.hypot(x1, y1));
-    const lobeTips = controlDistances.filter((distance) => Math.abs(distance - Math.max(...controlDistances)) < 1e-9);
+    const lobeTips = controlDistances.filter((distance) => isAlmostEqual(distance, Math.max(...controlDistances)));
     assert.equal(lobeTips.length, 6);
   });
 
@@ -160,7 +206,7 @@ describe('drawDriveIcon', () => {
     const [star, pin, ...others] = recessOf('torxTamperResistant');
 
     assert.deepEqual(star, recessOf('torx')[0]);
-    assert.ok(pin.every((command) => command.type !== 'C' || Math.hypot(command.x, command.y) < 0.3), 'pin is not central');
+    assert.ok(onCurvePointsOf(pin).every((point) => distanceFromCenter(point) < PIN_MAXIMUM_RADIUS), 'pin is not central');
     assert.equal(others.length, 0);
   });
 });

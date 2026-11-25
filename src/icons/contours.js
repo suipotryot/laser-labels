@@ -1,6 +1,7 @@
 const CIRCLE_ARC_HANDLE_RATIO = 0.5523;
+const PARALLEL_TOLERANCE = 1e-9;
 
-export function polygon(corners) {
+function polygon(corners) {
   const [first, ...others] = corners;
   return [
     { type: 'M', x: first.x, y: first.y },
@@ -9,7 +10,7 @@ export function polygon(corners) {
   ];
 }
 
-export function rectangle(halfWidth, halfHeight) {
+export function rectangle({ halfWidth, halfHeight }) {
   return polygon([
     { x: -halfWidth, y: -halfHeight },
     { x: -halfWidth, y: halfHeight },
@@ -18,58 +19,85 @@ export function rectangle(halfWidth, halfHeight) {
   ]);
 }
 
-function quarterTurn({ x, y }) {
-  return { x: y, y: -x };
+export function evenlySpacedAngle(index, count) {
+  return (2 * Math.PI * index) / count;
 }
 
-export function cross({ armLength, tipHalfWidth, rootHalfWidth }) {
-  let armCorners = [
+export function alternating(first, second, count) {
+  return Array.from({ length: count }, (_, index) => (index % 2 === 0 ? first : second));
+}
+
+function pointAtAngle(radius, angle) {
+  return { x: radius * Math.cos(angle), y: -radius * Math.sin(angle) };
+}
+
+function turnedBy({ x, y }, angle) {
+  return {
+    x: x * Math.cos(angle) + y * Math.sin(angle),
+    y: -x * Math.sin(angle) + y * Math.cos(angle),
+  };
+}
+
+export function taperedCross({ armLength, tipHalfWidth, rootHalfWidth }) {
+  const armCorners = [
     { x: tipHalfWidth, y: -armLength },
     { x: -tipHalfWidth, y: -armLength },
     { x: -rootHalfWidth, y: -rootHalfWidth },
   ];
-  const corners = [];
-  for (let arm = 0; arm < 4; arm += 1) {
-    corners.push(...armCorners);
-    armCorners = armCorners.map(quarterTurn);
-  }
+  const corners = [0, 1, 2, 3].flatMap((quarter) => armCorners.map((corner) => turnedBy(corner, evenlySpacedAngle(quarter, 4))));
   return polygon(corners);
 }
 
-export function pointAtAngle(radius, angle) {
-  return { x: radius * Math.cos(angle), y: -radius * Math.sin(angle) };
+function sideTowardNextArm({ angle, halfWidth }) {
+  return pointAtAngle(halfWidth, angle + Math.PI / 2);
 }
 
-function tipCornersOf({ angle, length, halfWidth }) {
-  const tip = pointAtAngle(length, angle);
-  const towardNextArm = pointAtAngle(halfWidth, angle + Math.PI / 2);
+function tipCornersOf(arm) {
+  const tip = pointAtAngle(arm.length, arm.angle);
+  const side = sideTowardNextArm(arm);
   return [
-    { x: tip.x - towardNextArm.x, y: tip.y - towardNextArm.y },
-    { x: tip.x + towardNextArm.x, y: tip.y + towardNextArm.y },
+    { x: tip.x - side.x, y: tip.y - side.y },
+    { x: tip.x + side.x, y: tip.y + side.y },
   ];
+}
+
+function edgeFacingNextArm(arm) {
+  return { point: sideTowardNextArm(arm), direction: pointAtAngle(1, arm.angle) };
+}
+
+function edgeFacingPreviousArm(arm) {
+  const side = sideTowardNextArm(arm);
+  return { point: { x: -side.x, y: -side.y }, direction: pointAtAngle(1, arm.angle) };
 }
 
 function determinant(first, second) {
   return first.x * second.y - first.y * second.x;
 }
 
-function cornerBetween(arm, nextArm) {
-  const direction = pointAtAngle(1, arm.angle);
-  const nextDirection = pointAtAngle(1, nextArm.angle);
-  const edgeStart = pointAtAngle(arm.halfWidth, arm.angle + Math.PI / 2);
-  const nextEdgeStart = pointAtAngle(nextArm.halfWidth, nextArm.angle - Math.PI / 2);
-  const gap = { x: nextEdgeStart.x - edgeStart.x, y: nextEdgeStart.y - edgeStart.y };
-  const distanceAlongEdge = determinant(gap, nextDirection) / determinant(direction, nextDirection);
-  return { x: edgeStart.x + distanceAlongEdge * direction.x, y: edgeStart.y + distanceAlongEdge * direction.y };
+function intersectionOf(firstLine, secondLine) {
+  const crossing = determinant(firstLine.direction, secondLine.direction);
+  if (Math.abs(crossing) < PARALLEL_TOLERANCE) {
+    throw new Error('Cannot join two parallel arms');
+  }
+  const gap = { x: secondLine.point.x - firstLine.point.x, y: secondLine.point.y - firstLine.point.y };
+  const distanceAlongFirstLine = determinant(gap, secondLine.direction) / crossing;
+  return {
+    x: firstLine.point.x + distanceAlongFirstLine * firstLine.direction.x,
+    y: firstLine.point.y + distanceAlongFirstLine * firstLine.direction.y,
+  };
 }
 
-export function armedStar(arms) {
+function cornerBetween(arm, nextArm) {
+  return intersectionOf(edgeFacingNextArm(arm), edgeFacingPreviousArm(nextArm));
+}
+
+export function starOfArms(arms) {
   const corners = arms.flatMap((arm, index) => [...tipCornersOf(arm), cornerBetween(arm, arms[(index + 1) % arms.length])]);
   return polygon(corners);
 }
 
-export function regularPolygon(cornerCount, radius) {
-  const corners = Array.from({ length: cornerCount }, (_, index) => pointAtAngle(radius, (2 * Math.PI * index) / cornerCount));
+export function regularPolygon({ cornerCount, radius }) {
+  const corners = Array.from({ length: cornerCount }, (_, index) => pointAtAngle(radius, evenlySpacedAngle(index, cornerCount)));
   return polygon(corners);
 }
 
@@ -77,7 +105,7 @@ function midpoint(from, to) {
   return { x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 };
 }
 
-function smoothPolygon(corners) {
+function roundedPolygon(corners) {
   const start = midpoint(corners.at(-1), corners[0]);
   const curves = corners.map((corner, index) => {
     const end = midpoint(corner, corners[(index + 1) % corners.length]);
@@ -87,12 +115,8 @@ function smoothPolygon(corners) {
 }
 
 export function roundedStar({ lobeCount, outerRadius, innerRadius }) {
-  const cornerCount = 2 * lobeCount;
-  const corners = Array.from({ length: cornerCount }, (_, index) => {
-    const radius = index % 2 === 0 ? outerRadius : innerRadius;
-    return pointAtAngle(radius, (2 * Math.PI * index) / cornerCount);
-  });
-  return smoothPolygon(corners);
+  const radii = alternating(outerRadius, innerRadius, 2 * lobeCount);
+  return roundedPolygon(radii.map((radius, index) => pointAtAngle(radius, evenlySpacedAngle(index, radii.length))));
 }
 
 export function circle(radius) {
@@ -107,18 +131,58 @@ export function circle(radius) {
   ];
 }
 
-function fitCoordinateInCircle(key, value, { x, y, radius }) {
-  if (key.startsWith('x')) {
-    return x + value * radius;
+const COORDINATE_PAIRS = [['x', 'y'], ['x1', 'y1'], ['x2', 'y2']];
+
+function placeCommandInCircle(command, { x, y, radius }) {
+  const placedCommand = { ...command };
+  for (const [xKey, yKey] of COORDINATE_PAIRS.filter(([xKey]) => xKey in command)) {
+    placedCommand[xKey] = x + command[xKey] * radius;
+    placedCommand[yKey] = y + command[yKey] * radius;
   }
-  if (key.startsWith('y')) {
-    return y + value * radius;
-  }
-  return value;
+  return placedCommand;
 }
 
-export function fitInCircle(commands, targetCircle) {
-  return commands.map((command) => Object.fromEntries(
-    Object.entries(command).map(([key, value]) => [key, fitCoordinateInCircle(key, value, targetCircle)]),
-  ));
+export function placeInCircle(unitDrawing, targetCircle) {
+  return unitDrawing.map((command) => placeCommandInCircle(command, targetCircle));
+}
+
+function signedAreaOnScreen(contour) {
+  const points = contour.filter((command) => command.type !== 'Z');
+  return points.reduce((area, point, index) => {
+    const next = points[(index + 1) % points.length];
+    return area + (point.x * next.y - next.x * point.y) / 2;
+  }, 0);
+}
+
+function isClockwiseOnScreen(contour) {
+  return signedAreaOnScreen(contour) > 0;
+}
+
+function reversedSegment(segment, start) {
+  const end = { x: start.x, y: start.y };
+  if (segment.type === 'L') {
+    return { type: 'L', ...end };
+  }
+  if (segment.type === 'Q') {
+    return { type: 'Q', x1: segment.x1, y1: segment.y1, ...end };
+  }
+  if (segment.type === 'C') {
+    return { type: 'C', x1: segment.x2, y1: segment.y2, x2: segment.x1, y2: segment.y1, ...end };
+  }
+  throw new Error(`Cannot reverse a ${segment.type} segment`);
+}
+
+function reversed(contour) {
+  const [move, ...segments] = contour.filter((command) => command.type !== 'Z');
+  const reversedSegments = segments.map((segment, index) => reversedSegment(segment, index === 0 ? move : segments[index - 1]));
+  const lastEnd = segments.at(-1);
+  return [{ type: 'M', x: lastEnd.x, y: lastEnd.y }, ...reversedSegments.reverse(), { type: 'Z' }];
+}
+
+export function hollow(contour) {
+  return isClockwiseOnScreen(contour) ? reversed(contour) : contour;
+}
+
+export function solid(contour) {
+  return isClockwiseOnScreen(contour) ? contour : reversed(contour);
 }
