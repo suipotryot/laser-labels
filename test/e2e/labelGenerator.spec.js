@@ -102,22 +102,23 @@ test.describe('preview', () => {
     expect(iconRight).toBeLessThan(driveSizeBox.left);
   });
 
-  test('should explain an invalid width instead of drawing', async ({ page }) => {
+  test('should explain an invalid width while keeping the last valid label greyed out', async ({ page }) => {
     await fillScrewLabel(page);
 
     await page.getByLabel('Largeur (mm)').fill('abc');
 
     await expect(page.getByRole('alert')).toHaveText('La largeur doit être un nombre positif (en mm).');
-    await expect(previewSvgOf(page)).toHaveCount(0);
+    await expect(textPathsOf(page)).toHaveCount(2);
+    await expect(page.locator('#preview')).toHaveClass(/is-outdated/);
   });
 
-  test('should list the characters the font cannot engrave instead of drawing', async ({ page }) => {
+  test('should list the characters the font cannot engrave while keeping the last valid label greyed out', async ({ page }) => {
     await fillScrewLabel(page);
 
     await page.getByLabel('Dimensions de la pièce').fill('⌀6 j́');
 
     await expect(page.getByRole('alert')).toHaveText('Ces caractères ne peuvent pas être gravés : ⌀ ́');
-    await expect(previewSvgOf(page)).toHaveCount(0);
+    await expect(page.locator('#preview')).toHaveClass(/is-outdated/);
   });
 
   test('should not announce the same error again while the field stays invalid', async ({ page }) => {
@@ -143,6 +144,7 @@ test.describe('preview', () => {
 
     await expect(page.getByRole('alert')).toBeEmpty();
     await expect(previewSvgOf(page)).toHaveCount(1);
+    await expect(page.locator('#preview')).not.toHaveClass(/is-outdated/);
   });
 
   test('should draw a frame when the frame box is checked', async ({ page }) => {

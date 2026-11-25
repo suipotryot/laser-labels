@@ -106,6 +106,7 @@ function smallDetailsWarningFor(spec) {
 function previewLabel(spec) {
   rememberPreviewedLabel({ svg: renderLabel(spec, engravingFont), fileName: buildFileName(spec) });
   preview.innerHTML = previewedLabel.svg;
+  preview.classList.remove('is-outdated');
   showMessages({ status: smallDetailsWarningFor(spec) });
 }
 
@@ -115,7 +116,8 @@ function clearPreview() {
 }
 
 function explainInvalidField(error) {
-  clearPreview();
+  forgetPreviewedLabel();
+  preview.classList.add('is-outdated');
   showMessages({ error: describeLabelSpecError(error) });
 }
 
