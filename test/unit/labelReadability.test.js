@@ -16,7 +16,7 @@ const screwSpec = {
 
 describe('hasDetailsTooSmallToEngrave', () => {
   it('should find long dimensions on a small label too small to engrave', () => {
-    const smallLabelSpec = { ...screwSpec, width: 20, height: 10, drive: null, dimensions: 'M5 x 52 tête fraisée' };
+    const smallLabelSpec = { ...screwSpec, width: 15, height: 8, drive: null, dimensions: 'M5 x 52 tête fraisée' };
 
     assert.equal(hasDetailsTooSmallToEngrave(smallLabelSpec, font), true);
   });
@@ -35,5 +35,11 @@ describe('hasDetailsTooSmallToEngrave', () => {
     const textlessSpec = { ...screwSpec, hardwareType: 'nut', drive: null, dimensions: '' };
 
     assert.equal(hasDetailsTooSmallToEngrave(textlessSpec, font), false);
+  });
+
+  it('should find a hardware silhouette too detailed to engrave on a tiny label', () => {
+    const tinyNailSpec = { ...screwSpec, width: 6, height: 6, hardwareType: 'nail', drive: null, dimensions: '' };
+
+    assert.equal(hasDetailsTooSmallToEngrave(tinyNailSpec, font), true);
   });
 });

@@ -5,6 +5,8 @@ import { toSvgPathData } from '../svg/pathData.js';
 import { escapeXml } from '../svg/escapeXml.js';
 import { hasLeadingIcon } from '../text/fitTextLines.js';
 import { drawDriveIconInCircle } from '../icons/driveIcons.js';
+import { isHardwareDrawingPending } from '../icons/hardwareIcons.js';
+import { placeHardwareIcon } from './placeHardwareIcon.js';
 
 const STROKE_WIDTH = 0.1;
 const FRAME_CORNER_RATIO = 0.1;
@@ -43,10 +45,28 @@ function renderLines(spec, font) {
     .join('');
 }
 
+function renderHardwareStrokes(hardwareTypeKey, strokes) {
+  return `<path data-hardware-strokes="${escapeXml(hardwareTypeKey)}" d="${toSvgPathData(strokes)}"/>`;
+}
+
+function renderOptionalHardwareStrokes(hardwareTypeKey, strokes) {
+  return strokes.length > 0 ? renderHardwareStrokes(hardwareTypeKey, strokes) : '';
+}
+
+function renderHardwareIcon(spec, font) {
+  const { outline, strokes } = placeHardwareIcon(spec, font);
+  const pathData = toSvgPathData(outline);
+  return `<path data-hardware-outline="${escapeXml(spec.hardwareType)}" d="${pathData}"/>` + renderOptionalHardwareStrokes(spec.hardwareType, strokes);
+}
+
+function renderOptionalHardwareIcon(spec, font) {
+  return isHardwareDrawingPending(spec.hardwareType) ? '' : renderHardwareIcon(spec, font);
+}
+
 function renderSvg({ width, height }, content) {
   return svgMarkup`<svg xmlns="http://www.w3.org/2000/svg" width="${width}mm" height="${height}mm" viewBox="0 0 ${width} ${height}" fill="none" stroke="#000" stroke-width="${STROKE_WIDTH}">${content}</svg>`;
 }
 
 export function renderLabel(spec, font) {
-  return renderSvg(spec, renderOptionalFrame(spec) + renderLines(spec, font));
+  return renderSvg(spec, renderOptionalFrame(spec) + renderOptionalHardwareIcon(spec, font) + renderLines(spec, font));
 }

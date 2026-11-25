@@ -1,13 +1,32 @@
 const CIRCLE_ARC_HANDLE_RATIO = 0.5523;
 const PARALLEL_TOLERANCE = 1e-9;
 
-function polygon(corners) {
-  const [first, ...others] = corners;
-  return [
-    { type: 'M', x: first.x, y: first.y },
-    ...others.map(({ x, y }) => ({ type: 'L', x, y })),
-    { type: 'Z' },
-  ];
+export function polyline(points) {
+  const [first, ...others] = points;
+  return [{ type: 'M', x: first.x, y: first.y }, ...others.map(({ x, y }) => ({ type: 'L', x, y }))];
+}
+
+export function polygon(corners) {
+  return [...polyline(corners), { type: 'Z' }];
+}
+
+function towards(from, to, distance) {
+  const length = Math.hypot(to.x - from.x, to.y - from.y);
+  return { x: from.x + ((to.x - from.x) * distance) / length, y: from.y + ((to.y - from.y) * distance) / length };
+}
+
+function cornerSegments(corner, previous, next) {
+  if (!corner.rounding) {
+    return [{ type: 'L', x: corner.x, y: corner.y }];
+  }
+  const entry = towards(corner, previous, corner.rounding);
+  const exit = towards(corner, next, corner.rounding);
+  return [{ type: 'L', ...entry }, { type: 'Q', x1: corner.x, y1: corner.y, x: exit.x, y: exit.y }];
+}
+
+export function polygonWithRoundedCorners(corners) {
+  const [first, ...others] = corners.flatMap((corner, index) => cornerSegments(corner, corners.at(index - 1), corners[(index + 1) % corners.length]));
+  return [{ type: 'M', x: first.x, y: first.y }, ...others, { type: 'Z' }];
 }
 
 export function rectangle({ halfWidth, halfHeight }) {
@@ -138,17 +157,55 @@ export function circle(radius) {
 
 const COORDINATE_PAIRS = [['x', 'y'], ['x1', 'y1'], ['x2', 'y2']];
 
-function placeCommandInCircle(command, { x, y, radius }) {
-  const placedCommand = { ...command };
+function withMovedPoints(command, movePoint) {
+  const movedCommand = { ...command };
   for (const [xKey, yKey] of COORDINATE_PAIRS.filter(([xKey]) => xKey in command)) {
-    placedCommand[xKey] = x + command[xKey] * radius;
-    placedCommand[yKey] = y + command[yKey] * radius;
+    const moved = movePoint({ x: command[xKey], y: command[yKey] });
+    movedCommand[xKey] = moved.x;
+    movedCommand[yKey] = moved.y;
   }
-  return placedCommand;
+  return movedCommand;
 }
 
-export function placeInCircle(unitDrawing, targetCircle) {
-  return unitDrawing.map((command) => placeCommandInCircle(command, targetCircle));
+function movedDrawing(drawing, movePoint) {
+  return drawing.map((command) => withMovedPoints(command, movePoint));
+}
+
+export function placeInCircle(unitDrawing, { x, y, radius }) {
+  return movedDrawing(unitDrawing, (point) => ({ x: x + point.x * radius, y: y + point.y * radius }));
+}
+
+function spanOf(values) {
+  const start = Math.min(...values);
+  return { start, size: Math.max(...values) - start };
+}
+
+function pointsAndControlPointsOf(command) {
+  return COORDINATE_PAIRS.filter(([xKey]) => xKey in command).map(([xKey, yKey]) => ({ x: command[xKey], y: command[yKey] }));
+}
+
+function extentOf(drawing) {
+  const points = drawing.flatMap(pointsAndControlPointsOf);
+  const horizontal = spanOf(points.map(({ x }) => x));
+  const vertical = spanOf(points.map(({ y }) => y));
+  return { left: horizontal.start, top: vertical.start, width: horizontal.size, height: vertical.size };
+}
+
+export function aspectRatioOf(drawings) {
+  const { width, height } = extentOf(drawings.flat());
+  return width / height;
+}
+
+export function placeTogetherInBox(drawings, box) {
+  const extent = extentOf(drawings.flat());
+  if (extent.width === 0 && extent.height === 0) {
+    throw new Error('Cannot place a drawing without extent');
+  }
+  const scale = Math.min(box.width / extent.width, box.height / extent.height);
+  const placedLeft = box.x + (box.width - extent.width * scale) / 2;
+  const placedTop = box.y + (box.height - extent.height * scale) / 2;
+  const placePoint = ({ x, y }) => ({ x: placedLeft + (x - extent.left) * scale, y: placedTop + (y - extent.top) * scale });
+  return { placedDrawings: drawings.map((drawing) => movedDrawing(drawing, placePoint)), scale };
 }
 
 function signedAreaOnScreen(contour) {

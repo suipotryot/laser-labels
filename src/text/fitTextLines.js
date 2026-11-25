@@ -7,8 +7,20 @@ export function hasLeadingIcon(line) {
   return Boolean(line.leadingIcon);
 }
 
+function scaleOf(line) {
+  return line.scale ?? 1;
+}
+
+function heightInUnscaledLines(lines) {
+  return lines.reduce((total, line) => total + scaleOf(line), 0);
+}
+
+function blockHeightPerFontSize(font, lines) {
+  return heightInUnscaledLines(lines) * fontBoxHeightPerFontSize(font);
+}
+
 function fontSizeAllowedByHeight(font, lines, zone) {
-  return zone.height / (lines.length * fontBoxHeightPerFontSize(font));
+  return zone.height / blockHeightPerFontSize(font, lines);
 }
 
 function inkSpanPerFontSize(font, text) {
@@ -25,11 +37,11 @@ function lineWidthPerFontSize(font, line) {
 }
 
 function fontSizeAllowedByWidth(font, lines, zone) {
-  const widestLinePerFontSize = Math.max(...lines.map((line) => lineWidthPerFontSize(font, line)));
+  const widestLinePerFontSize = Math.max(...lines.map((line) => lineWidthPerFontSize(font, line) * scaleOf(line)));
   return zone.width / widestLinePerFontSize;
 }
 
-function largestFittingFontSize(font, lines, zone) {
+export function largestFittingFontSize(font, lines, zone) {
   return Math.min(fontSizeAllowedByHeight(font, lines, zone), fontSizeAllowedByWidth(font, lines, zone));
 }
 
@@ -45,22 +57,34 @@ function middleOfCapitals(font, { fontSize, baseline }) {
   return baseline - (fontSize * capHeightPerFontSize(font)) / 2;
 }
 
-function leadingIconCircle(font, zone, placedLine) {
+function leadingIconCircle(font, lineLeft, placedLine) {
   const radius = (placedLine.fontSize * LEADING_ICON_DIAMETER_PER_FONT_SIZE) / 2;
-  return { x: zone.x + radius, y: middleOfCapitals(font, placedLine), radius };
+  return { x: lineLeft + radius, y: middleOfCapitals(font, placedLine), radius };
 }
 
-function placeLine(font, line, zone, { fontSize, baseline }) {
-  const textLeftEdge = zone.x + leadingIconAdvancePerFontSize(line) * fontSize;
+function lineLeftIn(zone, lineWidth, { centered }) {
+  return centered ? zone.x + (zone.width - lineWidth) / 2 : zone.x;
+}
+
+function placeLine(font, line, zone, { fontSize, baseline, centered }) {
+  const lineLeft = lineLeftIn(zone, lineWidthPerFontSize(font, line) * fontSize, { centered });
+  const textLeftEdge = lineLeft + leadingIconAdvancePerFontSize(line) * fontSize;
   const placedLine = { ...line, x: xStartingInkAt(font, line.text, textLeftEdge, fontSize), baseline, fontSize };
-  return hasLeadingIcon(line) ? { ...placedLine, leadingIconCircle: leadingIconCircle(font, zone, placedLine) } : placedLine;
+  return hasLeadingIcon(line) ? { ...placedLine, leadingIconCircle: leadingIconCircle(font, lineLeft, placedLine) } : placedLine;
 }
 
-export function fitTextLines(font, lines, zone) {
-  const fontSize = largestFittingFontSize(font, lines, zone);
-  const lineBoxHeight = fontSize * fontBoxHeightPerFontSize(font);
-  const blockTop = topOfCenteredBlock(zone, lineBoxHeight * lines.length);
-  const firstBaseline = blockTop + fontSize * fontBoxTopPerFontSize(font);
-  const baselineOf = (index) => firstBaseline + lineBoxHeight * index;
-  return lines.map((line, index) => placeLine(font, line, zone, { fontSize, baseline: baselineOf(index) }));
+function lineTopsFrom(blockTop, lineHeights) {
+  return lineHeights.map((_, index) => blockTop + lineHeights.slice(0, index).reduce((sum, height) => sum + height, 0));
+}
+
+export function fitTextLines(font, lines, zone, { centered } = { centered: false }) {
+  const baseFontSize = largestFittingFontSize(font, lines, zone);
+  const fontSizes = lines.map((line) => baseFontSize * scaleOf(line));
+  const blockTop = topOfCenteredBlock(zone, baseFontSize * blockHeightPerFontSize(font, lines));
+  const lineTops = lineTopsFrom(blockTop, fontSizes.map((fontSize) => fontSize * fontBoxHeightPerFontSize(font)));
+  return lines.map((line, index) => placeLine(font, line, zone, {
+    fontSize: fontSizes[index],
+    baseline: lineTops[index] + fontSizes[index] * fontBoxTopPerFontSize(font),
+    centered,
+  }));
 }

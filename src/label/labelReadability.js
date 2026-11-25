@@ -2,6 +2,8 @@ import { placeLabelTextLines } from './placeLabelTextLines.js';
 import { capHeightPerFontSize } from '../text/fontMetrics.js';
 import { hasLeadingIcon } from '../text/fitTextLines.js';
 import { thinnestDetailPerHeadRadius } from '../icons/driveIcons.js';
+import { isHardwareDrawingPending, thinnestHardwareDetail } from '../icons/hardwareIcons.js';
+import { placeHardwareIcon } from './placeHardwareIcon.js';
 
 const MINIMUM_READABLE_CAP_HEIGHT_MILLIMETERS = 1.5;
 const MINIMUM_ENGRAVABLE_DETAIL_MILLIMETERS = 0.15;
@@ -22,6 +24,14 @@ function hasLineDetailsTooSmallToEngrave(font, placedLine) {
   return isTextTooSmallToRead(font, placedLine) || hasDriveIconTooDetailedToEngrave(placedLine);
 }
 
+function hasHardwareIconTooDetailedToEngrave(spec, font) {
+  if (isHardwareDrawingPending(spec.hardwareType)) {
+    return false;
+  }
+  return thinnestHardwareDetail(spec.hardwareType) * placeHardwareIcon(spec, font).scale < MINIMUM_ENGRAVABLE_DETAIL_MILLIMETERS;
+}
+
 export function hasDetailsTooSmallToEngrave(spec, font) {
-  return placeLabelTextLines(spec, font).some((placedLine) => hasLineDetailsTooSmallToEngrave(font, placedLine));
+  return hasHardwareIconTooDetailedToEngrave(spec, font)
+    || placeLabelTextLines(spec, font).some((placedLine) => hasLineDetailsTooSmallToEngrave(font, placedLine));
 }

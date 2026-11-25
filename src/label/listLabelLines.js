@@ -1,5 +1,7 @@
+const DIMENSIONS_SCALE = 1.5;
+
 function dimensionsLine(spec) {
-  return spec.dimensions ? { text: spec.dimensions } : null;
+  return spec.dimensions ? { text: spec.dimensions, scale: DIMENSIONS_SCALE } : null;
 }
 
 function driveLine(spec) {
