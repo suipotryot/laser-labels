@@ -4,6 +4,7 @@ import {
   evenlySpacedAngle,
   hollow,
   placeInCircle,
+  reachOfRoundedStar,
   rectangle,
   regularPolygon,
   roundedStar,
@@ -22,6 +23,10 @@ const POZIDRIV_DIAGONAL_ARM = { length: 0.5, halfWidth: 0.04 };
 const TORX_STAR = { lobeCount: 6, outerRadius: 0.72, innerRadius: 0.36 };
 const TORX_PIN_RADIUS = 0.14;
 
+function rimAround(recessReach) {
+  return UNIT_HEAD_RADIUS - recessReach;
+}
+
 function drawPozidrivRecess() {
   const arms = alternating(POZIDRIV_STRAIGHT_ARM, POZIDRIV_DIAGONAL_ARM, 8);
   return starOfArms(arms.map((arm, index) => ({ ...arm, angle: evenlySpacedAngle(index, arms.length) })));
@@ -38,15 +43,15 @@ const DRIVE_ICONS = {
   },
   torx: {
     drawRecess: () => hollow(roundedStar(TORX_STAR)),
-    thinnestDetail: UNIT_HEAD_RADIUS - TORX_STAR.outerRadius,
+    thinnestDetail: rimAround(reachOfRoundedStar(TORX_STAR)),
   },
   torxTamperResistant: {
     drawRecess: () => [...hollow(roundedStar(TORX_STAR)), ...solid(circle(TORX_PIN_RADIUS))],
-    thinnestDetail: Math.min(UNIT_HEAD_RADIUS - TORX_STAR.outerRadius, 2 * TORX_PIN_RADIUS),
+    thinnestDetail: Math.min(rimAround(reachOfRoundedStar(TORX_STAR)), 2 * TORX_PIN_RADIUS),
   },
   hexSocket: {
     drawRecess: () => hollow(regularPolygon(HEXAGON)),
-    thinnestDetail: UNIT_HEAD_RADIUS - HEXAGON.radius,
+    thinnestDetail: rimAround(HEXAGON.radius),
   },
   slotted: {
     drawRecess: () => hollow(rectangle(SLOT)),
@@ -54,7 +59,7 @@ const DRIVE_ICONS = {
   },
   square: {
     drawRecess: () => hollow(rectangle(SQUARE)),
-    thinnestDetail: UNIT_HEAD_RADIUS - Math.hypot(SQUARE.halfWidth, SQUARE.halfHeight),
+    thinnestDetail: rimAround(Math.hypot(SQUARE.halfWidth, SQUARE.halfHeight)),
   },
 };
 
@@ -74,6 +79,6 @@ export function drawDriveIconInCircle(driveTypeKey, targetCircle) {
   return placeInCircle(drawDriveIcon(driveTypeKey), targetCircle);
 }
 
-export function thinnestDetailOf(driveTypeKey) {
+export function thinnestDetailPerHeadRadius(driveTypeKey) {
   return driveIconOf(driveTypeKey).thinnestDetail;
 }

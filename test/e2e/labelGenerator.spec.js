@@ -7,7 +7,7 @@ const SMALL_DETAILS_NOTICE = "Certains détails sont très petits : ils risquent
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/');
-  await expect(page.locator('#preview svg')).toHaveCount(1);
+  await expect(previewSvgOf(page)).toHaveCount(1);
 });
 
 async function fillScrewLabel(page) {
@@ -19,8 +19,22 @@ async function fillScrewLabel(page) {
   await page.getByLabel('Dimensions de la pièce').fill('3,5x50');
 }
 
+function previewSvgOf(page) {
+  return page.locator('#preview svg');
+}
+
+function downloadButtonOf(page) {
+  return page.getByRole('button', { name: 'Télécharger' });
+}
+
+async function downloadLabel(page) {
+  const downloadPromise = page.waitForEvent('download');
+  await downloadButtonOf(page).click();
+  return downloadPromise;
+}
+
 function textPathsOf(page) {
-  return page.locator('#preview svg path[aria-label]');
+  return previewSvgOf(page).locator('path[aria-label]');
 }
 
 function textLinesOf(page) {
@@ -45,7 +59,7 @@ function textBoxesOf(page) {
 
 test.describe('preview', () => {
   test('should draw the label as soon as the page opens', async ({ page }) => {
-    await expect(page.locator('#preview svg')).toHaveAttribute('width', '60mm');
+    await expect(previewSvgOf(page)).toHaveAttribute('width', '60mm');
   });
 
   test('should need no button to draw the label', async ({ page }) => {
@@ -70,7 +84,7 @@ test.describe('preview', () => {
   test('should show the label sized in millimeters with its text lines', async ({ page }) => {
     await fillScrewLabel(page);
 
-    const preview = page.locator('#preview svg');
+    const preview = previewSvgOf(page);
     await expect(preview).toHaveAttribute('width', '60mm');
     await expect(preview).toHaveAttribute('height', '20mm');
     expect(await textLinesOf(page)).toEqual(['3,5x50', 'PZ2']);
@@ -94,7 +108,7 @@ test.describe('preview', () => {
     await page.getByLabel('Largeur (mm)').fill('abc');
 
     await expect(page.getByRole('alert')).toHaveText('La largeur doit être un nombre positif (en mm).');
-    await expect(page.locator('#preview svg')).toHaveCount(0);
+    await expect(previewSvgOf(page)).toHaveCount(0);
   });
 
   test('should list the characters the font cannot engrave instead of drawing', async ({ page }) => {
@@ -103,7 +117,22 @@ test.describe('preview', () => {
     await page.getByLabel('Dimensions de la pièce').fill('⌀6 j́');
 
     await expect(page.getByRole('alert')).toHaveText('Ces caractères ne peuvent pas être gravés : ⌀ ́');
-    await expect(page.locator('#preview svg')).toHaveCount(0);
+    await expect(previewSvgOf(page)).toHaveCount(0);
+  });
+
+  test('should not announce the same error again while the field stays invalid', async ({ page }) => {
+    await page.getByLabel('Largeur (mm)').fill('abc');
+    await page.locator('#error-message').evaluate((errorMessage) => {
+      globalThis.errorMessageChanges = 0;
+      new MutationObserver((changes) => {
+        globalThis.errorMessageChanges += changes.length;
+      }).observe(errorMessage, { childList: true, characterData: true, subtree: true });
+    });
+
+    await page.getByLabel('Largeur (mm)').pressSequentially('de');
+
+    await expect(page.getByRole('alert')).toHaveText('La largeur doit être un nombre positif (en mm).');
+    expect(await page.evaluate(() => globalThis.errorMessageChanges)).toBe(0);
   });
 
   test('should clear the previous error once the field is valid again', async ({ page }) => {
@@ -113,7 +142,7 @@ test.describe('preview', () => {
     await page.getByLabel('Largeur (mm)').fill('60');
 
     await expect(page.getByRole('alert')).toBeEmpty();
-    await expect(page.locator('#preview svg')).toHaveCount(1);
+    await expect(previewSvgOf(page)).toHaveCount(1);
   });
 
   test('should draw a frame when the frame box is checked', async ({ page }) => {
@@ -169,6 +198,28 @@ test.describe('preview', () => {
     await expect(page.getByText(SMALL_DETAILS_NOTICE)).toBeVisible();
   });
 
+  test('should clear the preview and explain an unexpected error instead of keeping the previous label', async ({ page }) => {
+    await page.locator('#preview').evaluate((preview) => {
+      Object.defineProperty(preview, 'innerHTML', { set: () => { throw new Error('Display broken'); } });
+    });
+
+    await page.getByLabel('Dimensions de la pièce').fill('4x40');
+
+    await expect(page.getByRole('alert')).toHaveText("Une erreur inattendue empêche de dessiner l'étiquette.");
+    await expect(previewSvgOf(page)).toHaveCount(0);
+    await expect(downloadButtonOf(page)).toBeDisabled();
+  });
+
+  test('should tell the font is loading until the label can be drawn', async ({ page }) => {
+    await page.addInitScript(() => {
+      globalThis.fetch = () => new Promise(() => {});
+    });
+
+    await page.reload();
+
+    await expect(page.getByRole('status')).toHaveText('Chargement de la police de gravure…');
+  });
+
   test('should explain that no label can be drawn when the font fails to load', async ({ page }) => {
     await page.addInitScript(() => {
       globalThis.fetch = () => Promise.reject(new Error('Network down'));
@@ -177,8 +228,8 @@ test.describe('preview', () => {
     await page.reload();
 
     await expect(page.getByRole('alert')).toHaveText(FONT_LOADING_FAILURE_NOTICE);
-    await expect(page.locator('#preview svg')).toHaveCount(0);
-    await expect(page.getByRole('button', { name: 'Télécharger' })).toBeDisabled();
+    await expect(previewSvgOf(page)).toHaveCount(0);
+    await expect(downloadButtonOf(page)).toBeDisabled();
   });
 
   test('should explain that no label can be drawn when the font cannot be found', async ({ page }) => {
@@ -189,8 +240,8 @@ test.describe('preview', () => {
     await page.reload();
 
     await expect(page.getByRole('alert')).toHaveText(FONT_LOADING_FAILURE_NOTICE);
-    await expect(page.locator('#preview svg')).toHaveCount(0);
-    await expect(page.getByRole('button', { name: 'Télécharger' })).toBeDisabled();
+    await expect(previewSvgOf(page)).toHaveCount(0);
+    await expect(downloadButtonOf(page)).toBeDisabled();
   });
 });
 
@@ -210,6 +261,15 @@ test.describe('hardware type select', () => {
     await page.getByLabel('Dimensions de la pièce').fill('M6');
 
     expect(await textLinesOf(page)).toEqual(['M6']);
+  });
+
+  test('should drop the drive from the label as soon as a hardware without drive is chosen', async ({ page }) => {
+    await fillScrewLabel(page);
+
+    await page.getByLabel('Type de quincaillerie').selectOption({ label: 'Écrou' });
+
+    expect(await textLinesOf(page)).toEqual(['3,5x50']);
+    await expect(page.locator('#preview svg path[data-drive-icon]')).toHaveCount(0);
   });
 
   test('should show the drive fields again when coming back to a screw', async ({ page }) => {
@@ -265,15 +325,13 @@ test.describe('drive type select', () => {
 
 test.describe('download button', () => {
   test('should be enabled once the label is drawn', async ({ page }) => {
-    await expect(page.getByRole('button', { name: 'Télécharger' })).toBeEnabled();
+    await expect(downloadButtonOf(page)).toBeEnabled();
   });
 
   test('should download the drawn SVG under a name describing its content', async ({ page }) => {
     await fillScrewLabel(page);
 
-    const downloadPromise = page.waitForEvent('download');
-    await page.getByRole('button', { name: 'Télécharger' }).click();
-    const download = await downloadPromise;
+    const download = await downloadLabel(page);
 
     expect(download.suggestedFilename()).toBe('vis-3,5x50-pz2.svg');
     const downloadedSvg = await readFile(await download.path(), 'utf8');
@@ -286,9 +344,7 @@ test.describe('download button', () => {
     await fillScrewLabel(page);
     await page.getByLabel('Dimensions de la pièce').fill('4x40');
 
-    const downloadPromise = page.waitForEvent('download');
-    await page.getByRole('button', { name: 'Télécharger' }).click();
-    const download = await downloadPromise;
+    const download = await downloadLabel(page);
 
     expect(download.suggestedFilename()).toBe('vis-4x40-pz2.svg');
     expect(await readFile(await download.path(), 'utf8')).toContain('aria-label="4x40"');
@@ -299,6 +355,6 @@ test.describe('download button', () => {
 
     await page.getByLabel('Largeur (mm)').fill('abc');
 
-    await expect(page.getByRole('button', { name: 'Télécharger' })).toBeDisabled();
+    await expect(downloadButtonOf(page)).toBeDisabled();
   });
 });

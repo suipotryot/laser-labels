@@ -3,13 +3,15 @@ import { driveTypes, findDriveType, NO_DRIVE } from './catalog/driveTypes.js';
 import { readLabelSpec, LabelSpecError } from './label/labelSpec.js';
 import { describeLabelSpecError } from './label/errorMessages.js';
 import { renderLabel } from './label/renderLabel.js';
-import { isLabelTooSmallToRead } from './label/labelReadability.js';
+import { hasDetailsTooSmallToEngrave } from './label/labelReadability.js';
 import { buildFileName } from './label/fileName.js';
 import { downloadSvg } from './download.js';
 import { loadEngravingFont } from './text/loadEngravingFont.js';
 
 const SMALL_DETAILS_NOTICE = "Certains détails sont très petits : ils risquent d'être illisibles une fois gravés.";
 const FONT_LOADING_FAILURE_NOTICE = "La police de gravure n'a pas pu être chargée : rechargez la page.";
+const FONT_LOADING_NOTICE = "Chargement de la police de gravure…";
+const UNEXPECTED_ERROR_NOTICE = "Une erreur inattendue empêche de dessiner l'étiquette.";
 
 const form = document.getElementById('label-form');
 const widthInput = document.getElementById('width');
@@ -74,75 +76,88 @@ function readFormFields() {
 }
 
 let engravingFont = null;
+let previewedLabel = null;
 
-function explainFontLoadingFailure(error) {
-  errorMessage.textContent = FONT_LOADING_FAILURE_NOTICE;
-  throw error;
-}
-
-let drawnLabel = null;
-
-function forgetDrawnLabel() {
-  drawnLabel = null;
-  downloadButton.disabled = true;
-}
-
-function clearMessages() {
-  errorMessage.textContent = '';
-  previewStatus.textContent = '';
-}
-
-function showPreview(svg) {
-  clearMessages();
-  preview.innerHTML = svg;
+function rememberPreviewedLabel(label) {
+  previewedLabel = label;
   downloadButton.disabled = false;
 }
 
-function warnIfLabelIsTooSmall(spec) {
-  if (isLabelTooSmallToRead(spec, engravingFont)) {
-    previewStatus.textContent = SMALL_DETAILS_NOTICE;
+function forgetPreviewedLabel() {
+  previewedLabel = null;
+  downloadButton.disabled = true;
+}
+
+function updateText(element, text) {
+  if (element.textContent !== text) {
+    element.textContent = text;
   }
 }
 
-function rememberAndShowLabel(spec) {
-  drawnLabel = { svg: renderLabel(spec, engravingFont), fileName: buildFileName(spec) };
-  showPreview(drawnLabel.svg);
-  warnIfLabelIsTooSmall(spec);
+function showMessages({ error = '', status = '' }) {
+  updateText(errorMessage, error);
+  updateText(previewStatus, status);
 }
 
-function explainInvalidField(error) {
-  forgetDrawnLabel();
-  clearMessages();
-  errorMessage.textContent = describeLabelSpecError(error);
+function smallDetailsWarningFor(spec) {
+  return hasDetailsTooSmallToEngrave(spec, engravingFont) ? SMALL_DETAILS_NOTICE : '';
+}
+
+function previewLabel(spec) {
+  rememberPreviewedLabel({ svg: renderLabel(spec, engravingFont), fileName: buildFileName(spec) });
+  preview.innerHTML = previewedLabel.svg;
+  showMessages({ status: smallDetailsWarningFor(spec) });
+}
+
+function clearPreview() {
+  forgetPreviewedLabel();
   preview.replaceChildren();
 }
 
-function drawLabel() {
+function explainInvalidField(error) {
+  clearPreview();
+  showMessages({ error: describeLabelSpecError(error) });
+}
+
+function explainUnexpectedError(error) {
+  clearPreview();
+  showMessages({ error: UNEXPECTED_ERROR_NOTICE });
+  throw error;
+}
+
+function refreshPreview() {
   try {
-    rememberAndShowLabel(readLabelSpec(readFormFields(), engravingFont));
+    previewLabel(readLabelSpec(readFormFields(), engravingFont));
   } catch (error) {
-    if (!(error instanceof LabelSpecError)) {
-      throw error;
+    if (error instanceof LabelSpecError) {
+      explainInvalidField(error);
+    } else {
+      explainUnexpectedError(error);
     }
-    explainInvalidField(error);
   }
 }
 
-function startDrawingWith(font) {
-  engravingFont = font;
-  form.addEventListener('input', drawLabel);
-  drawLabel();
+function downloadPreviewedLabel() {
+  downloadSvg(previewedLabel.svg, previewedLabel.fileName);
 }
 
-function downloadDrawnLabel() {
-  downloadSvg(drawnLabel.svg, drawnLabel.fileName);
+function startPreviewingWith(font) {
+  engravingFont = font;
+  form.addEventListener('input', refreshPreview);
+  refreshPreview();
+}
+
+function explainFontLoadingFailure(error) {
+  showMessages({ error: FONT_LOADING_FAILURE_NOTICE });
+  throw error;
 }
 
 populateHardwareTypes();
 populateDriveTypes();
 populateDriveSizes();
 showDriveFieldsOnlyForHardwareWithDrive();
+showMessages({ status: FONT_LOADING_NOTICE });
 hardwareTypeSelect.addEventListener('input', showDriveFieldsOnlyForHardwareWithDrive);
 driveTypeSelect.addEventListener('input', populateDriveSizes);
-downloadButton.addEventListener('click', downloadDrawnLabel);
-loadEngravingFont().then(startDrawingWith, explainFontLoadingFailure);
+downloadButton.addEventListener('click', downloadPreviewedLabel);
+loadEngravingFont().then(startPreviewingWith, explainFontLoadingFailure);
