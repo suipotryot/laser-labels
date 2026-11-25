@@ -1,46 +1,13 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { drawHardwareIcon } from '../../src/icons/hardwareIcons.js';
+import { drawHardwareIcon, isHardwareDrawingPending, thinnestHardwareDetail } from '../../src/icons/hardwareIcons.js';
+import { hardwareTypes } from '../../src/catalog/hardwareTypes.js';
+import { contoursOf, cornersOf, extentOf, isAlmostEqual, windingOf } from './helpers/geometry.js';
 
 const DRAWN_HARDWARE = ['screw', 'nail', 'bolt', 'nut'];
-const FLOATING_POINT_TOLERANCE = 1e-9;
-
-function contoursOf(commands) {
-  const contours = [];
-  for (const command of commands) {
-    if (command.type === 'M') {
-      contours.push([]);
-    }
-    contours.at(-1).push(command);
-  }
-  return contours;
-}
-
-function cornersOf(contour) {
-  return contour.filter((command) => command.type === 'M' || command.type === 'L');
-}
-
-function extentOf(points) {
-  const xs = points.map(({ x }) => x);
-  const ys = points.map(({ y }) => y);
-  return { left: Math.min(...xs), right: Math.max(...xs), top: Math.min(...ys), bottom: Math.max(...ys) };
-}
-
-function isAlmostEqual(actual, expected) {
-  return Math.abs(actual - expected) < FLOATING_POINT_TOLERANCE;
-}
 
 function cornersAt(corners, x) {
   return corners.filter((corner) => isAlmostEqual(corner.x, x));
-}
-
-function windingOf(contour) {
-  const points = contour.filter((command) => command.type !== 'Z');
-  const signedArea = points.reduce((area, point, index) => {
-    const next = points[(index + 1) % points.length];
-    return area + (point.x * next.y - next.x * point.y) / 2;
-  }, 0);
-  return signedArea > 0 ? 'clockwise' : 'counterclockwise';
 }
 
 function strokesOf(commands) {
@@ -75,6 +42,10 @@ describe('drawHardwareIcon', () => {
 
   it('should refuse a hardware type it cannot draw', () => {
     assert.throws(() => drawHardwareIcon('spaceship'), /No icon for hardware type: spaceship/);
+  });
+
+  it('should refuse a name inherited by every object rather than a hardware type', () => {
+    assert.throws(() => drawHardwareIcon('constructor'), /No icon for hardware type: constructor/);
   });
 
   it('should draw a screw lying with its head on the left, straight edges, a pointed tip and diagonal threads crossing its edges', () => {
@@ -132,11 +103,13 @@ describe('drawHardwareIcon', () => {
     assert.equal(cornersAt(corners, extent.right).length, 2, 'the end is not flat');
     const headEnd = Math.max(...tallestCorners.map(({ x }) => x));
     const verticalStrokes = strokesOf(strokes).filter(([start, end]) => isAlmostEqual(start.x, end.x));
-    const fullHeightStrokes = verticalStrokes.filter(([start, end]) => isAlmostEqual(Math.abs(end.y - start.y), extent.bottom - extent.top));
-    assert.ok(fullHeightStrokes.some(([start]) => isAlmostEqual(start.x, headEnd)), 'no full line between the head and the shank');
-    assert.ok(fullHeightStrokes.some(([start]) => start.x < headEnd), 'no line at the chamfered corner of the head');
-    const threads = verticalStrokes.filter(([start]) => start.x > headEnd);
     const shankRadius = Math.abs(cornersAt(corners, headEnd).find(({ y }) => !isAlmostEqual(y, extent.top) && y < 0).y);
+    const spanOf = ([start, end]) => Math.abs(end.y - start.y);
+    const lineBetweenHeadAndShank = verticalStrokes.find(([start]) => isAlmostEqual(start.x, headEnd));
+    assert.ok(lineBetweenHeadAndShank, 'no line between the head and the shank');
+    assert.ok(isAlmostEqual(spanOf(lineBetweenHeadAndShank), 2 * shankRadius), 'the line between head and shank goes over the outline');
+    assert.ok(verticalStrokes.some((stroke) => stroke[0].x < headEnd && isAlmostEqual(spanOf(stroke), extent.bottom - extent.top)), 'no line at the chamfered corner of the head');
+    const threads = verticalStrokes.filter(([start]) => start.x > headEnd);
     assert.ok(threads.every(([start, end]) => Math.abs(start.y) > shankRadius && Math.abs(end.y) > shankRadius), 'threads do not cross the edges');
     assert.ok(Math.min(...threads.map(([start]) => start.x)) < headEnd + length / 10, 'threads do not start near the head');
     assert.ok(Math.max(...threads.map(([start]) => start.x)) > extent.right - length / 10, 'threads do not reach the end');
@@ -151,5 +124,35 @@ describe('drawHardwareIcon', () => {
     assert.ok(hole.some(({ type }) => type === 'C'), 'the hole is not round');
     assert.notEqual(windingOf(hole), windingOf(hexagon), 'the hole would be filled');
     assert.equal(strokes.length, 0);
+  });
+});
+
+describe('isHardwareDrawingPending', () => {
+  it('should tell apart every hardware type of the catalog that still waits for its drawing from the drawn ones', () => {
+    for (const { key } of hardwareTypes) {
+      if (isHardwareDrawingPending(key)) {
+        assert.throws(() => drawHardwareIcon(key), `${key} is drawn but still listed as pending`);
+      } else {
+        assert.doesNotThrow(() => drawHardwareIcon(key), `${key} has no drawing and is not listed as pending`);
+      }
+    }
+  });
+});
+
+describe('thinnestHardwareDetail', () => {
+  it('should give the thickness of the head of a nail', () => {
+    const corners = cornersOf(contoursOf(drawHardwareIcon('nail').outline)[0]);
+    const extent = extentOf(corners);
+    const headCorners = corners.filter(({ y }) => isAlmostEqual(y, extent.top));
+
+    assert.ok(isAlmostEqual(thinnestHardwareDetail('nail'), extentOf(headCorners).right - extent.left));
+  });
+
+  it('should give the width of the chamfer of the head of a bolt', () => {
+    const corners = cornersOf(contoursOf(drawHardwareIcon('bolt').outline)[0]);
+    const extent = extentOf(corners);
+    const chamferEnd = Math.min(...corners.filter(({ y }) => isAlmostEqual(y, extent.top)).map(({ x }) => x));
+
+    assert.ok(isAlmostEqual(thinnestHardwareDetail('bolt'), chamferEnd - extent.left));
   });
 });

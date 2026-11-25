@@ -11,12 +11,16 @@ function scaleOf(line) {
   return line.scale ?? 1;
 }
 
-function totalScaleOf(lines) {
+function heightInUnscaledLines(lines) {
   return lines.reduce((total, line) => total + scaleOf(line), 0);
 }
 
+function blockHeightPerFontSize(font, lines) {
+  return heightInUnscaledLines(lines) * fontBoxHeightPerFontSize(font);
+}
+
 function fontSizeAllowedByHeight(font, lines, zone) {
-  return zone.height / (totalScaleOf(lines) * fontBoxHeightPerFontSize(font));
+  return zone.height / blockHeightPerFontSize(font, lines);
 }
 
 function inkSpanPerFontSize(font, text) {
@@ -64,18 +68,17 @@ function placeLine(font, line, zone, { fontSize, baseline }) {
   return hasLeadingIcon(line) ? { ...placedLine, leadingIconCircle: leadingIconCircle(font, zone, placedLine) } : placedLine;
 }
 
-function placeLinesBelow(font, lines, zone, { blockTop, baseFontSize }) {
-  let lineTop = blockTop;
-  return lines.map((line) => {
-    const fontSize = baseFontSize * scaleOf(line);
-    const baseline = lineTop + fontSize * fontBoxTopPerFontSize(font);
-    lineTop += fontSize * fontBoxHeightPerFontSize(font);
-    return placeLine(font, line, zone, { fontSize, baseline });
-  });
+function lineTopsFrom(blockTop, lineHeights) {
+  return lineHeights.map((_, index) => blockTop + lineHeights.slice(0, index).reduce((sum, height) => sum + height, 0));
 }
 
 export function fitTextLines(font, lines, zone) {
   const baseFontSize = largestFittingFontSize(font, lines, zone);
-  const blockHeight = totalScaleOf(lines) * baseFontSize * fontBoxHeightPerFontSize(font);
-  return placeLinesBelow(font, lines, zone, { blockTop: topOfCenteredBlock(zone, blockHeight), baseFontSize });
+  const fontSizes = lines.map((line) => baseFontSize * scaleOf(line));
+  const blockTop = topOfCenteredBlock(zone, baseFontSize * blockHeightPerFontSize(font, lines));
+  const lineTops = lineTopsFrom(blockTop, fontSizes.map((fontSize) => fontSize * fontBoxHeightPerFontSize(font)));
+  return lines.map((line, index) => placeLine(font, line, zone, {
+    fontSize: fontSizes[index],
+    baseline: lineTops[index] + fontSizes[index] * fontBoxTopPerFontSize(font),
+  }));
 }

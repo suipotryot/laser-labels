@@ -2,34 +2,22 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { drawDriveIcon, thinnestDetailPerHeadRadius } from '../../src/icons/driveIcons.js';
 import { driveTypes } from '../../src/catalog/driveTypes.js';
+import {
+  FLOATING_POINT_TOLERANCE,
+  contoursOf,
+  cornersOf,
+  isAlmostEqual,
+  onCurvePointsOf,
+  windingOf,
+} from './helpers/geometry.js';
 
-const FLOATING_POINT_TOLERANCE = 1e-9;
 const PIN_MAXIMUM_RADIUS = 0.3;
 const HEAD_RADIUS = 1;
 const CURVE_SAMPLES = 1000;
 
-function contoursOf(commands) {
-  const contours = [];
-  for (const command of commands) {
-    if (command.type === 'M') {
-      contours.push([]);
-    }
-    contours.at(-1).push(command);
-  }
-  return contours;
-}
-
 function recessOf(driveTypeKey) {
   const [, ...recessContours] = contoursOf(drawDriveIcon(driveTypeKey));
   return recessContours;
-}
-
-function cornersOf(contour) {
-  return contour.filter((command) => command.type === 'M' || command.type === 'L');
-}
-
-function onCurvePointsOf(contour) {
-  return contour.filter((command) => command.type !== 'Z');
 }
 
 function sizeOf(contour) {
@@ -38,25 +26,12 @@ function sizeOf(contour) {
   return { width: Math.max(...xs) - Math.min(...xs), height: Math.max(...ys) - Math.min(...ys) };
 }
 
-function windingOf(contour) {
-  const points = onCurvePointsOf(contour);
-  const signedArea = points.reduce((area, point, index) => {
-    const next = points[(index + 1) % points.length];
-    return area + (point.x * next.y - next.x * point.y) / 2;
-  }, 0);
-  return signedArea > 0 ? 'clockwise' : 'counterclockwise';
-}
-
 function distanceFromCenter({ x, y }) {
   return Math.hypot(x, y);
 }
 
 function distanceBetween(from, to) {
   return Math.hypot(to.x - from.x, to.y - from.y);
-}
-
-function isAlmostEqual(actual, expected) {
-  return Math.abs(actual - expected) < FLOATING_POINT_TOLERANCE;
 }
 
 function isUnchangedByQuarterTurn(corners) {
@@ -131,6 +106,10 @@ describe('drawDriveIcon', () => {
 
   it('should refuse a drive type it cannot draw', () => {
     assert.throws(() => drawDriveIcon('triangle'), /No icon for drive type: triangle/);
+  });
+
+  it('should refuse a name inherited by every object rather than a drive type', () => {
+    assert.throws(() => drawDriveIcon('constructor'), /No icon for drive type: constructor/);
   });
 
   it('should wind the recess opposite to the head so that it stays hollow once filled', () => {

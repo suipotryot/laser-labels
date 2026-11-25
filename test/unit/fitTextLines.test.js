@@ -119,7 +119,7 @@ describe('fitTextLines', () => {
     assertWithinZoneWidth(placedLines, widthLimitingZone);
   });
 
-  it('should give every line the same font size', () => {
+  it('should give every unscaled line the same font size', () => {
     const placedLines = fitTextLines(font, textLines('Cheville Molly', '6x52'), zone);
 
     assert.equal(placedLines[0].fontSize, placedLines[1].fontSize);

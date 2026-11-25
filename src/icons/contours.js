@@ -138,7 +138,7 @@ export function circle(radius) {
 
 const COORDINATE_PAIRS = [['x', 'y'], ['x1', 'y1'], ['x2', 'y2']];
 
-function movePointsOf(command, movePoint) {
+function withMovedPoints(command, movePoint) {
   const movedCommand = { ...command };
   for (const [xKey, yKey] of COORDINATE_PAIRS.filter(([xKey]) => xKey in command)) {
     const moved = movePoint({ x: command[xKey], y: command[yKey] });
@@ -148,32 +148,45 @@ function movePointsOf(command, movePoint) {
   return movedCommand;
 }
 
-function movePoints(drawing, movePoint) {
-  return drawing.map((command) => movePointsOf(command, movePoint));
+function movedDrawing(drawing, movePoint) {
+  return drawing.map((command) => withMovedPoints(command, movePoint));
 }
 
 export function placeInCircle(unitDrawing, { x, y, radius }) {
-  return movePoints(unitDrawing, (point) => ({ x: x + point.x * radius, y: y + point.y * radius }));
+  return movedDrawing(unitDrawing, (point) => ({ x: x + point.x * radius, y: y + point.y * radius }));
+}
+
+function spanOf(values) {
+  const start = Math.min(...values);
+  return { start, size: Math.max(...values) - start };
+}
+
+function pointsAndControlPointsOf(command) {
+  return COORDINATE_PAIRS.filter(([xKey]) => xKey in command).map(([xKey, yKey]) => ({ x: command[xKey], y: command[yKey] }));
 }
 
 function extentOf(drawing) {
-  const points = drawing.filter((command) => command.type !== 'Z');
-  const xs = points.map((point) => point.x);
-  const ys = points.map((point) => point.y);
-  return { left: Math.min(...xs), top: Math.min(...ys), width: Math.max(...xs) - Math.min(...xs), height: Math.max(...ys) - Math.min(...ys) };
+  const points = drawing.flatMap(pointsAndControlPointsOf);
+  const horizontal = spanOf(points.map(({ x }) => x));
+  const vertical = spanOf(points.map(({ y }) => y));
+  return { left: horizontal.start, top: vertical.start, width: horizontal.size, height: vertical.size };
 }
 
 function turnedUpright(drawing) {
-  return movePoints(drawing, ({ x, y }) => ({ x: -y, y: x }));
+  return movedDrawing(drawing, ({ x, y }) => ({ x: -y, y: x }));
 }
 
-export function placeInBox(lyingDrawing, box, { upright }) {
-  const drawing = upright ? turnedUpright(lyingDrawing) : lyingDrawing;
-  const extent = extentOf(drawing);
+export function placeTogetherInBox(lyingDrawings, box, { upright }) {
+  const drawings = lyingDrawings.map((drawing) => (upright ? turnedUpright(drawing) : drawing));
+  const extent = extentOf(drawings.flat());
+  if (extent.width === 0 && extent.height === 0) {
+    throw new Error('Cannot place a drawing without extent');
+  }
   const scale = Math.min(box.width / extent.width, box.height / extent.height);
-  const left = box.x + (box.width - extent.width * scale) / 2;
-  const top = box.y + (box.height - extent.height * scale) / 2;
-  return movePoints(drawing, (point) => ({ x: left + (point.x - extent.left) * scale, y: top + (point.y - extent.top) * scale }));
+  const placedLeft = box.x + (box.width - extent.width * scale) / 2;
+  const placedTop = box.y + (box.height - extent.height * scale) / 2;
+  const placePoint = ({ x, y }) => ({ x: placedLeft + (x - extent.left) * scale, y: placedTop + (y - extent.top) * scale });
+  return { placedDrawings: drawings.map((drawing) => movedDrawing(drawing, placePoint)), scale };
 }
 
 function signedAreaOnScreen(contour) {

@@ -64,11 +64,10 @@ const DRIVE_ICONS = {
 };
 
 function driveIconOf(driveTypeKey) {
-  const driveIcon = DRIVE_ICONS[driveTypeKey];
-  if (!driveIcon) {
+  if (!Object.hasOwn(DRIVE_ICONS, driveTypeKey)) {
     throw new Error(`No icon for drive type: ${driveTypeKey}`);
   }
-  return driveIcon;
+  return DRIVE_ICONS[driveTypeKey];
 }
 
 export function drawDriveIcon(driveTypeKey) {

@@ -143,9 +143,9 @@ describe('renderLabel', () => {
     const { iconZone } = computeLayout(screwSpec);
     const svg = parseSvg(renderLabel(screwSpec, font));
 
-    const [silhouette] = pathsWithAttribute(svg, 'data-hardware-icon');
+    const [silhouette] = pathsWithAttribute(svg, 'data-hardware-outline');
     const [strokes] = pathsWithAttribute(svg, 'data-hardware-strokes');
-    assert.equal(silhouette.getAttribute('data-hardware-icon'), 'screw');
+    assert.equal(silhouette.getAttribute('data-hardware-outline'), 'screw');
     assert.equal(strokes.getAttribute('data-hardware-strokes'), 'screw');
     for (const point of [silhouette, strokes].flatMap(onCurvePointsOf)) {
       assert.ok(isInsideZone(point, iconZone), `(${point.x}, ${point.y}) is outside the icon zone`);
@@ -157,23 +157,36 @@ describe('renderLabel', () => {
     const { iconZone } = computeLayout(stackedSpec);
     const svg = parseSvg(renderLabel(stackedSpec, font));
 
-    const [silhouette] = pathsWithAttribute(svg, 'data-hardware-icon');
+    const [silhouette] = pathsWithAttribute(svg, 'data-hardware-outline');
+    const [strokesPath] = pathsWithAttribute(svg, 'data-hardware-strokes');
     const { left, right } = horizontalSpanOf(silhouette);
     const { top, bottom } = verticalSpanOf(silhouette);
     assert.ok(bottom - top > 3 * (right - left), 'the silhouette is not upright');
-    assert.ok(onCurvePointsOf(silhouette).every((point) => isInsideZone(point, iconZone)), 'the silhouette leaves the icon zone');
+    assert.ok([silhouette, strokesPath].flatMap(onCurvePointsOf).every((point) => isInsideZone(point, iconZone)), 'the silhouette leaves the icon zone');
   });
 
-  it('should write the dimensions one and a half times bigger than the drive size', () => {
-    const [dimensionsLine, driveLine] = placeLabelTextLines(screwSpec, font);
+  it('should stand the silhouette upright when its icon zone is taller than wide, even on a label wider than tall', () => {
+    const shortLabelSpec = { ...screwSpec, width: 30, height: 20 };
+    const { iconZone } = computeLayout(shortLabelSpec);
+    const svg = parseSvg(renderLabel(shortLabelSpec, font));
 
-    assert.ok(Math.abs(dimensionsLine.fontSize - 1.5 * driveLine.fontSize) < 1e-9);
+    const [silhouette] = pathsWithAttribute(svg, 'data-hardware-outline');
+    const { top, bottom } = verticalSpanOf(silhouette);
+    assert.ok(iconZone.height > iconZone.width);
+    assert.ok(Math.abs(bottom - top - iconZone.height) < 1e-3, 'the silhouette does not use the height of its zone');
+  });
+
+  it('should draw no strokes path for hardware without strokes', () => {
+    const svg = parseSvg(renderLabel({ ...screwSpec, hardwareType: 'nail', drive: null }, font));
+
+    assert.equal(pathsWithAttribute(svg, 'data-hardware-outline').length, 1);
+    assert.equal(pathsWithAttribute(svg, 'data-hardware-strokes').length, 0);
   });
 
   it('should draw no silhouette for a hardware type that has no drawing yet', () => {
     const svg = parseSvg(renderLabel({ ...screwSpec, hardwareType: 'hook', drive: null }, font));
 
-    assert.equal(pathsWithAttribute(svg, 'data-hardware-icon').length, 0);
+    assert.equal(pathsWithAttribute(svg, 'data-hardware-outline').length, 0);
   });
 
   it('should draw no drive icon when there is no drive', () => {

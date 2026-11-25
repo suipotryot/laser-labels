@@ -5,8 +5,8 @@ import { toSvgPathData } from '../svg/pathData.js';
 import { escapeXml } from '../svg/escapeXml.js';
 import { hasLeadingIcon } from '../text/fitTextLines.js';
 import { drawDriveIconInCircle } from '../icons/driveIcons.js';
-import { drawHardwareIconInBox, hasHardwareIcon } from '../icons/hardwareIcons.js';
-import { computeLayout } from './layout.js';
+import { isHardwareDrawingPending } from '../icons/hardwareIcons.js';
+import { placeHardwareIcon } from './placeHardwareIcon.js';
 
 const STROKE_WIDTH = 0.1;
 const FRAME_CORNER_RATIO = 0.1;
@@ -46,18 +46,21 @@ function renderLines(spec, font) {
 }
 
 function renderHardwareStrokes(hardwareTypeKey, strokes) {
-  return strokes.length > 0 ? `<path data-hardware-strokes="${escapeXml(hardwareTypeKey)}" d="${toSvgPathData(strokes)}"/>` : '';
+  return `<path data-hardware-strokes="${escapeXml(hardwareTypeKey)}" d="${toSvgPathData(strokes)}"/>`;
+}
+
+function renderOptionalHardwareStrokes(hardwareTypeKey, strokes) {
+  return strokes.length > 0 ? renderHardwareStrokes(hardwareTypeKey, strokes) : '';
 }
 
 function renderHardwareIcon(spec) {
-  const { orientation, iconZone } = computeLayout(spec);
-  const { outline, strokes } = drawHardwareIconInBox(spec.hardwareType, iconZone, { upright: orientation === 'stacked' });
-  const outlinePath = `<path data-hardware-icon="${escapeXml(spec.hardwareType)}" d="${toSvgPathData(outline)}"/>`;
-  return outlinePath + renderHardwareStrokes(spec.hardwareType, strokes);
+  const { outline, strokes } = placeHardwareIcon(spec);
+  const pathData = toSvgPathData(outline);
+  return `<path data-hardware-outline="${escapeXml(spec.hardwareType)}" d="${pathData}"/>` + renderOptionalHardwareStrokes(spec.hardwareType, strokes);
 }
 
 function renderOptionalHardwareIcon(spec) {
-  return hasHardwareIcon(spec.hardwareType) ? renderHardwareIcon(spec) : '';
+  return isHardwareDrawingPending(spec.hardwareType) ? '' : renderHardwareIcon(spec);
 }
 
 function renderSvg({ width, height }, content) {
