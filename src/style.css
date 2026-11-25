@@ -135,10 +135,6 @@ button:disabled {
   margin-bottom: 1rem;
 }
 
-#preview.is-outdated {
-  opacity: 0.4;
-}
-
 #preview svg {
   display: block;
   width: 100%;
