@@ -5,6 +5,7 @@ import {
   hollow,
   placeInCircle,
   placeTogetherInBox,
+  pointOnCircle,
   polygonWithRoundedCorners,
   polyline,
   regularPolygon,
@@ -56,15 +57,18 @@ const EYE_SCREW = {
   tipEnd: 3.7,
 };
 const HOOK = {
-  bendCenter: { x: 1, y: -0.42 },
-  bendRadius: 0.42,
-  hookEnd: 1.25,
+  loopRadius: 0.55,
+  loopEndAngle: Math.PI / 4,
+  junction: 1.2,
+  collarStart: 1.55,
+  collarEnd: 1.7,
+  collarRadius: 0.17,
   shankRadius: 0.12,
   threadOverhang: 0.05,
-  threadStart: 1.6,
+  threadStart: 1.95,
   threadPitch: 0.16,
-  shankEnd: 3.3,
-  tipEnd: 3.7,
+  shankEnd: 3.4,
+  tipEnd: 3.8,
 };
 const WALL_PLUG = {
   collarRadius: 0.4,
@@ -243,23 +247,29 @@ function drawEyeScrew() {
   };
 }
 
-function hookBody() {
-  const bendOutside = { center: HOOK.bendCenter, radius: HOOK.bendRadius + HOOK.shankRadius };
-  const bendInside = { center: HOOK.bendCenter, radius: HOOK.bendRadius - HOOK.shankRadius };
-  const hookTop = HOOK.bendCenter.y - HOOK.bendRadius;
-  const roundedEnd = { center: { x: HOOK.hookEnd, y: hookTop }, radius: HOOK.shankRadius };
-  const bendStart = HOOK.bendCenter.x;
+function hookEdge(side) {
   return [
-    { type: 'M', ...atSide(bendStart, HOOK.shankRadius, TOP) },
-    { type: 'L', ...atSide(HOOK.shankEnd, HOOK.shankRadius, TOP) },
+    atSide(HOOK.junction, HOOK.shankRadius, side),
+    atSide(HOOK.collarStart, HOOK.shankRadius, side),
+    atSide(HOOK.collarStart, HOOK.collarRadius, side),
+    atSide(HOOK.collarEnd, HOOK.collarRadius, side),
+    atSide(HOOK.collarEnd, HOOK.shankRadius, side),
+    atSide(HOOK.shankEnd, HOOK.shankRadius, side),
+  ];
+}
+
+function hookBody() {
+  const loopCenter = { x: HOOK.junction, y: -HOOK.loopRadius };
+  const wireEnd = pointOnCircle({ center: loopCenter, radius: HOOK.loopRadius }, HOOK.loopEndAngle);
+  const [shankTopAtJunction, ...shankTop] = hookEdge(TOP);
+  return [
+    { type: 'M', ...shankTopAtJunction },
+    ...shankTop.map((point) => ({ type: 'L', ...point })),
     { type: 'L', x: HOOK.tipEnd, y: 0 },
-    { type: 'L', ...atSide(HOOK.shankEnd, HOOK.shankRadius, BOTTOM) },
-    { type: 'L', ...atSide(bendStart, HOOK.shankRadius, BOTTOM) },
-    ...arc({ ...bendOutside, fromAngle: (3 * Math.PI) / 2, toAngle: Math.PI / 2 }),
-    { type: 'L', x: HOOK.hookEnd, y: hookTop - HOOK.shankRadius },
-    ...arc({ ...roundedEnd, fromAngle: Math.PI / 2, toAngle: -Math.PI / 2 }),
-    { type: 'L', x: bendStart, y: hookTop + HOOK.shankRadius },
-    ...arc({ ...bendInside, fromAngle: Math.PI / 2, toAngle: (3 * Math.PI) / 2 }),
+    ...hookEdge(BOTTOM).reverse().map((point) => ({ type: 'L', ...point })),
+    ...arc({ center: loopCenter, radius: HOOK.loopRadius + HOOK.shankRadius, fromAngle: (3 * Math.PI) / 2, toAngle: HOOK.loopEndAngle }),
+    ...arc({ center: wireEnd, radius: HOOK.shankRadius, fromAngle: HOOK.loopEndAngle, toAngle: HOOK.loopEndAngle - Math.PI }),
+    ...arc({ center: loopCenter, radius: HOOK.loopRadius - HOOK.shankRadius, fromAngle: HOOK.loopEndAngle, toAngle: (3 * Math.PI) / 2 }),
     { type: 'Z' },
   ];
 }

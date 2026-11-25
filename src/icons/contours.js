@@ -144,7 +144,7 @@ export function reachOfRoundedStar({ lobeCount, outerRadius, innerRadius }) {
   return (midpointBesideLobeTip + outerRadius) / 2;
 }
 
-function pointOnCircle({ center, radius }, angle) {
+export function pointOnCircle({ center, radius }, angle) {
   const offset = pointAtAngle(radius, angle);
   return { x: center.x + offset.x, y: center.y + offset.y };
 }

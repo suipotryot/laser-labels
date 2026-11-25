@@ -214,6 +214,10 @@ describe('drawHardwareIcon', () => {
     const threads = strokesOf(strokes).filter(([start, end]) => !isAlmostEqual(start.x, end.x));
     assert.ok(threads.length > 5, 'no diagonal threads');
     assert.ok(Math.min(...threads.map(([start]) => start.x)) > hookEnd, 'the threads run under the hook');
+    const junction = Math.min(...points.filter(({ y }) => isAlmostEqual(y, shankRadius)).map(({ x }) => x));
+    assert.ok(points.some(({ x, y }) => x > junction && y < extent.top / 2), 'the hook does not curl back over the shank');
+    assert.ok(!contour.some(({ type, y }) => type === 'L' && y < -2 * shankRadius), 'the hook has a straight part');
+    assert.ok(points.some(({ y }) => y > shankRadius * 1.2), 'no collar before the threads');
   });
 
   it('should draw a wall plug lying with a collar on the left, small fins, a rounded end and a ladder along its axis', () => {
