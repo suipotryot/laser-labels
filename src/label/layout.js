@@ -22,7 +22,7 @@ function splitSideBySide(inner, gap) {
   };
 }
 
-function splitOneAboveTheOther(inner, gap) {
+function splitStacked(inner, gap) {
   const iconHeight = Math.min(inner.height * ICON_SHARE, inner.width * ICON_MAX_ASPECT_RATIO);
   return {
     iconZone: { ...inner, height: iconHeight },
@@ -34,7 +34,7 @@ export function computeLayout(size) {
   const margin = marginFor(size);
   const inner = innerZone(size, margin);
   if (isTallerThanWide(size)) {
-    return { orientation: 'stacked', ...splitOneAboveTheOther(inner, margin) };
+    return { orientation: 'stacked', ...splitStacked(inner, margin) };
   }
   return { orientation: 'sideBySide', ...splitSideBySide(inner, margin) };
 }

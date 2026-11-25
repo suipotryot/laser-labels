@@ -31,19 +31,21 @@ function textPathsOf(svg) {
   return Array.from(svg.getElementsByTagName('path')).filter((path) => path.hasAttribute('aria-label'));
 }
 
-const PATH_COMMAND_LETTER = /[MLQCZ]/;
-
-function pointsOf(path) {
-  const numbers = path.getAttribute('d').split(PATH_COMMAND_LETTER).join(' ').trim().split(/\s+/).map(Number);
-  const points = [];
-  for (let index = 0; index < numbers.length; index += 2) {
-    points.push({ x: numbers[index], y: numbers[index + 1] });
-  }
-  return points;
-}
-
 function textLinesOf(svg) {
   return textPathsOf(svg).map((path) => path.getAttribute('aria-label'));
+}
+
+const PATH_COMMAND = /[MLQC][^MLQCZ]*/g;
+
+function onCurvePointsOf(path) {
+  return path.getAttribute('d').match(PATH_COMMAND).map((command) => {
+    const [x, y] = command.slice(1).trim().split(/\s+/).map(Number).slice(-2);
+    return { x, y };
+  });
+}
+
+function isInsideZone(point, zone) {
+  return point.x >= zone.x && point.x <= zone.x + zone.width && point.y >= zone.y && point.y <= zone.y + zone.height;
 }
 
 describe('renderLabel', () => {
@@ -106,6 +108,12 @@ describe('renderLabel', () => {
     assert.deepEqual(textLinesOf(svg), ['Vis', '<5 & >3', 'PZ2']);
   });
 
+  it('should escape a double quote typed in the dimensions', () => {
+    const svg = parseSvg(renderLabel({ ...screwSpec, dimensions: '1/4"' }, font));
+
+    assert.deepEqual(textLinesOf(svg), ['Vis', '1/4"', 'PZ2']);
+  });
+
   it('should draw the text as outlines rather than text elements', () => {
     const svg = parseSvg(renderLabel(screwSpec, font));
 
@@ -135,16 +143,9 @@ describe('renderLabel', () => {
     const { textZone } = computeLayout(mollySpec);
     const svg = parseSvg(renderLabel(mollySpec, font));
 
-    for (const point of textPathsOf(svg).flatMap(pointsOf)) {
-      assert.ok(point.x >= textZone.x && point.x <= textZone.x + textZone.width, `x=${point.x} is outside the text zone`);
-      assert.ok(point.y >= textZone.y && point.y <= textZone.y + textZone.height, `y=${point.y} is outside the text zone`);
+    for (const point of textPathsOf(svg).flatMap(onCurvePointsOf)) {
+      assert.ok(isInsideZone(point, textZone), `(${point.x}, ${point.y}) is outside the text zone`);
     }
-  });
-
-  it('should escape a double quote typed in the dimensions', () => {
-    const svg = parseSvg(renderLabel({ ...screwSpec, dimensions: '1/4"' }, font));
-
-    assert.deepEqual(textLinesOf(svg), ['Vis', '1/4"', 'PZ2']);
   });
 
   it('should write the text below the icon zone of a stacked label', () => {
@@ -152,7 +153,7 @@ describe('renderLabel', () => {
     const { iconZone } = computeLayout(stackedSpec);
     const svg = parseSvg(renderLabel(stackedSpec, font));
 
-    for (const point of textPathsOf(svg).flatMap(pointsOf)) {
+    for (const point of textPathsOf(svg).flatMap(onCurvePointsOf)) {
       assert.ok(point.y > iconZone.y + iconZone.height);
     }
   });

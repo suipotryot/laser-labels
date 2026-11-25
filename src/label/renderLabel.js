@@ -3,6 +3,8 @@ import { listLabelLines } from './listLabelLines.js';
 import { fitTextLines } from '../text/fitTextLines.js';
 import { outlineTextLine } from '../text/outlineTextLine.js';
 import { svgMarkup } from '../svg/svgMarkup.js';
+import { toSvgPathData } from '../svg/pathData.js';
+import { escapeXml } from '../svg/escapeXml.js';
 
 const STROKE_WIDTH = 0.1;
 const FRAME_CORNER_RATIO = 0.1;
@@ -17,14 +19,9 @@ function renderOptionalFrame(spec) {
   return spec.hasFrame ? renderFrame(spec) : '';
 }
 
-const XML_ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' };
-
-function escapeXml(text) {
-  return text.replace(/[&<>"]/g, (character) => XML_ESCAPES[character]);
-}
-
 function renderTextLine(font, placedLine) {
-  return `<path aria-label="${escapeXml(placedLine.text)}" d="${outlineTextLine(font, placedLine)}"/>`;
+  const pathData = toSvgPathData(outlineTextLine(font, placedLine));
+  return `<path aria-label="${escapeXml(placedLine.text)}" d="${pathData}"/>`;
 }
 
 function renderTextLines(font, lines, zone) {
@@ -39,5 +36,6 @@ function renderSvg({ width, height }, content) {
 
 export function renderLabel(spec, font) {
   const { textZone } = computeLayout(spec);
-  return renderSvg(spec, renderOptionalFrame(spec) + renderTextLines(font, listLabelLines(spec), textZone));
+  const content = renderOptionalFrame(spec) + renderTextLines(font, listLabelLines(spec), textZone);
+  return renderSvg(spec, content);
 }

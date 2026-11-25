@@ -13,13 +13,21 @@ const errorMessages = {
     unknown: "Type d'empreinte inconnu.",
   },
   driveSize: { unknown: "Cette taille ne correspond pas au type d'empreinte choisi." },
-  dimensions: { invalidCharacters: 'Les dimensions contiennent des caractères invisibles non gravables.' },
+  dimensions: {
+    tooLong: 'Les dimensions ne doivent pas dépasser 40 caractères.',
+    invalidCharacters: 'Les dimensions contiennent des caractères invisibles non gravables.',
+    unsupportedCharacters: ({ characters }) => `Ces caractères ne peuvent pas être gravés : ${characters.join(' ')}`,
+  },
 };
 
-export function describeLabelSpecError({ field, reason }) {
-  const message = errorMessages[field]?.[reason];
+function isWrittenFromErrorDetails(message) {
+  return typeof message === 'function';
+}
+
+export function describeLabelSpecError(error) {
+  const message = errorMessages[error.field]?.[error.reason];
   if (!message) {
-    throw new Error(`No message for ${field}.${reason}`);
+    throw new Error(`No message for ${error.field}.${error.reason}`);
   }
-  return message;
+  return isWrittenFromErrorDetails(message) ? message(error) : message;
 }

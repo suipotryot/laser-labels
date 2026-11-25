@@ -5,7 +5,7 @@ import { describeLabelSpecError } from './label/errorMessages.js';
 import { renderLabel } from './label/renderLabel.js';
 import { buildFileName } from './label/fileName.js';
 import { downloadSvg } from './download.js';
-import { loadFont } from './text/loadFont.js';
+import { loadEngravingFont } from './text/loadEngravingFont.js';
 
 const OUTDATED_PREVIEW_NOTICE = "Le formulaire a changé : cliquez sur Générer pour mettre à jour l'aperçu.";
 const FONT_LOADING_FAILURE_NOTICE = "La police de gravure n'a pas pu être chargée : rechargez la page.";
@@ -25,21 +25,17 @@ const preview = document.getElementById('preview');
 const generateButton = document.getElementById('generate');
 const downloadButton = document.getElementById('download');
 
-function replaceOptions(select, options) {
-  select.replaceChildren(...options.map(({ value, label }) => new Option(label, value)));
-}
-
 function toOption({ key, name }) {
-  return { value: key, label: name };
+  return new Option(name, key);
 }
 
 function populateHardwareTypes() {
-  replaceOptions(hardwareTypeSelect, hardwareTypes.map(toOption));
+  hardwareTypeSelect.replaceChildren(...hardwareTypes.map(toOption));
 }
 
 function populateDriveTypes() {
-  const noDrive = { value: NO_DRIVE, label: 'Aucune' };
-  replaceOptions(driveTypeSelect, [noDrive, ...driveTypes.map(toOption)]);
+  const noDrive = new Option('Aucune', NO_DRIVE);
+  driveTypeSelect.replaceChildren(noDrive, ...driveTypes.map(toOption));
 }
 
 function sizesOfChosenDriveType() {
@@ -54,7 +50,7 @@ function sizesOfChosenDriveType() {
 }
 
 function populateDriveSizes() {
-  replaceOptions(driveSizeSelect, sizesOfChosenDriveType().map((size) => ({ value: size, label: size })));
+  driveSizeSelect.replaceChildren(...sizesOfChosenDriveType().map((size) => new Option(size, size)));
 }
 
 function showDriveFieldsOnlyForHardwareWithDrive() {
@@ -96,26 +92,34 @@ function forgetGeneratedLabel() {
   downloadButton.disabled = true;
 }
 
-function rememberAndShowLabel(spec) {
-  generatedLabel = { svg: renderLabel(spec, engravingFont), fileName: buildFileName(spec) };
+function clearMessages() {
   errorMessage.textContent = '';
   previewStatus.textContent = '';
+}
+
+function showPreview(svg) {
+  clearMessages();
   preview.classList.remove('is-outdated');
-  preview.innerHTML = generatedLabel.svg;
+  preview.innerHTML = svg;
   downloadButton.disabled = false;
+}
+
+function rememberAndShowLabel(spec) {
+  generatedLabel = { svg: renderLabel(spec, engravingFont), fileName: buildFileName(spec) };
+  showPreview(generatedLabel.svg);
 }
 
 function explainInvalidField(error) {
   forgetGeneratedLabel();
+  clearMessages();
   errorMessage.textContent = describeLabelSpecError(error);
-  previewStatus.textContent = '';
   preview.replaceChildren();
 }
 
 function generateLabel(event) {
   event.preventDefault();
   try {
-    rememberAndShowLabel(readLabelSpec(readFormFields()));
+    rememberAndShowLabel(readLabelSpec(readFormFields(), engravingFont));
   } catch (error) {
     if (!(error instanceof LabelSpecError)) {
       throw error;
@@ -153,4 +157,4 @@ driveTypeSelect.addEventListener('change', populateDriveSizes);
 form.addEventListener('submit', generateLabel);
 form.addEventListener('input', handleFormChange);
 downloadButton.addEventListener('click', downloadGeneratedLabel);
-loadFont().then(enableGenerationWith, explainFontLoadingFailure);
+loadEngravingFont().then(enableGenerationWith, explainFontLoadingFailure);

@@ -2,6 +2,8 @@ import { readFile } from 'node:fs/promises';
 import { test, expect } from '@playwright/test';
 import { computeLayout } from '../../src/label/layout.js';
 
+const FONT_LOADING_FAILURE_NOTICE = "La police de gravure n'a pas pu être chargée : rechargez la page.";
+
 test.beforeEach(async ({ page }) => {
   await page.goto('/');
 });
@@ -25,6 +27,15 @@ function textPathsOf(page) {
 
 function textLinesOf(page) {
   return textPathsOf(page).evaluateAll((paths) => paths.map((path) => path.getAttribute('aria-label')));
+}
+
+const ROUNDING_TOLERANCE_MILLIMETERS = 0.001;
+
+function isInsideZone(box, zone) {
+  return box.left >= zone.x - ROUNDING_TOLERANCE_MILLIMETERS
+    && box.right <= zone.x + zone.width + ROUNDING_TOLERANCE_MILLIMETERS
+    && box.top >= zone.y - ROUNDING_TOLERANCE_MILLIMETERS
+    && box.bottom <= zone.y + zone.height + ROUNDING_TOLERANCE_MILLIMETERS;
 }
 
 function textBoxesOf(page) {
@@ -53,6 +64,16 @@ test.describe('generate button', () => {
     await generate(page);
 
     await expect(page.getByRole('alert')).toHaveText('La largeur doit être un nombre positif (en mm).');
+    await expect(page.locator('#preview svg')).toHaveCount(0);
+  });
+
+  test('should list the characters the font cannot engrave instead of previewing', async ({ page }) => {
+    await fillScrewLabel(page);
+    await page.getByLabel('Dimensions de la pièce').fill('⌀6 j́');
+
+    await generate(page);
+
+    await expect(page.getByRole('alert')).toHaveText('Ces caractères ne peuvent pas être gravés : ⌀ ́');
     await expect(page.locator('#preview svg')).toHaveCount(0);
   });
 
@@ -89,7 +110,7 @@ test.describe('generate button', () => {
     }
   });
 
-  test('should keep a long hardware name inside the label', async ({ page }) => {
+  test('should keep a long hardware name inside the text zone', async ({ page }) => {
     await page.getByLabel('Largeur (mm)').fill('60');
     await page.getByLabel('Hauteur (mm)').fill('20');
     await page.getByLabel('Type de quincaillerie').selectOption({ label: 'Cheville Molly' });
@@ -97,11 +118,34 @@ test.describe('generate button', () => {
 
     await generate(page);
 
+    const { textZone } = computeLayout({ width: 60, height: 20 });
     const textBoxes = await textBoxesOf(page);
     expect(textBoxes).toHaveLength(2);
     for (const textBox of textBoxes) {
-      expect(textBox.right).toBeLessThanOrEqual(60);
+      expect(isInsideZone(textBox, textZone)).toBe(true);
     }
+  });
+
+  test('should stay disabled and explain why when the font fails to load', async ({ page }) => {
+    await page.addInitScript(() => {
+      globalThis.fetch = () => Promise.reject(new Error('Network down'));
+    });
+
+    await page.reload();
+
+    await expect(page.getByRole('alert')).toHaveText(FONT_LOADING_FAILURE_NOTICE);
+    await expect(page.getByRole('button', { name: 'Générer' })).toBeDisabled();
+  });
+
+  test('should stay disabled and explain why when the font cannot be found', async ({ page }) => {
+    await page.addInitScript(() => {
+      globalThis.fetch = () => Promise.resolve(new Response(null, { status: 404 }));
+    });
+
+    await page.reload();
+
+    await expect(page.getByRole('alert')).toHaveText(FONT_LOADING_FAILURE_NOTICE);
+    await expect(page.getByRole('button', { name: 'Générer' })).toBeDisabled();
   });
 });
 
@@ -204,19 +248,6 @@ test.describe('download button', () => {
     await generate(page);
 
     await expect(page.getByRole('button', { name: 'Télécharger' })).toBeDisabled();
-  });
-});
-
-test.describe('font loading', () => {
-  test('should explain that labels cannot be generated when the font fails to load', async ({ page }) => {
-    await page.addInitScript(() => {
-      globalThis.fetch = () => Promise.reject(new Error('Network down'));
-    });
-
-    await page.reload();
-
-    await expect(page.getByRole('alert')).toHaveText("La police de gravure n'a pas pu être chargée : rechargez la page.");
-    await expect(page.getByRole('button', { name: 'Générer' })).toBeDisabled();
   });
 });
 
