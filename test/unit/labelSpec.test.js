@@ -1,6 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { readLabelSpec } from '../../src/label/labelSpec.js';
+import { NO_DRIVE } from '../../src/catalog/driveTypes.js';
 
 const validFields = {
   width: '60',
@@ -43,7 +44,7 @@ describe('readLabelSpec', () => {
   });
 
   it('should keep a hardware type known by the catalog', () => {
-    const spec = readLabelSpec({ ...validFields, hardwareType: 'nut', driveType: '', driveSize: '' });
+    const spec = readLabelSpec({ ...validFields, hardwareType: 'nut', driveType: NO_DRIVE, driveSize: '' });
 
     assert.equal(spec.hardwareType, 'nut');
   });
@@ -62,7 +63,7 @@ describe('readLabelSpec', () => {
   });
 
   it('should have no drive when the drive type is left empty', () => {
-    const spec = readLabelSpec({ ...validFields, driveType: '', driveSize: '' });
+    const spec = readLabelSpec({ ...validFields, driveType: NO_DRIVE, driveSize: '' });
 
     assert.equal(spec.drive, null);
   });

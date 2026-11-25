@@ -1,5 +1,5 @@
 import { hardwareTypes, findHardwareType } from './catalog/hardwareTypes.js';
-import { driveTypes, findDriveType } from './catalog/driveTypes.js';
+import { driveTypes, findDriveType, NO_DRIVE } from './catalog/driveTypes.js';
 import { readLabelSpec, LabelSpecError } from './label/labelSpec.js';
 import { describeLabelSpecError } from './label/errorMessages.js';
 import { renderLabel } from './label/renderLabel.js';
@@ -26,8 +26,8 @@ function replaceOptions(select, options) {
   select.replaceChildren(...options.map(({ value, label }) => new Option(label, value)));
 }
 
-function toOption({ key, label }) {
-  return { value: key, label };
+function toOption({ key, name }) {
+  return { value: key, label: name };
 }
 
 function populateHardwareTypes() {
@@ -35,12 +35,12 @@ function populateHardwareTypes() {
 }
 
 function populateDriveTypes() {
-  const noDrive = { value: '', label: 'Aucune' };
+  const noDrive = { value: NO_DRIVE, label: 'Aucune' };
   replaceOptions(driveTypeSelect, [noDrive, ...driveTypes.map(toOption)]);
 }
 
 function sizesOfChosenDriveType() {
-  if (driveTypeSelect.value === '') {
+  if (driveTypeSelect.value === NO_DRIVE) {
     return [];
   }
   const driveType = findDriveType(driveTypeSelect.value);
@@ -58,8 +58,8 @@ function showDriveFieldsOnlyForHardwareWithDrive() {
   driveFields.hidden = !findHardwareType(hardwareTypeSelect.value).hasDrive;
 }
 
-function readDriveType() {
-  return driveFields.hidden ? '' : driveTypeSelect.value;
+function readDriveTypeIfShown() {
+  return driveFields.hidden ? NO_DRIVE : driveTypeSelect.value;
 }
 
 function readFormFields() {
@@ -67,7 +67,7 @@ function readFormFields() {
     width: widthInput.value,
     height: heightInput.value,
     hardwareType: hardwareTypeSelect.value,
-    driveType: readDriveType(),
+    driveType: readDriveTypeIfShown(),
     driveSize: driveSizeSelect.value,
     dimensions: dimensionsInput.value,
     hasFrame: hasFrameCheckbox.checked,
@@ -81,7 +81,7 @@ function forgetGeneratedLabel() {
   downloadButton.disabled = true;
 }
 
-function showLabel(spec) {
+function rememberAndShowLabel(spec) {
   generatedLabel = { svg: renderLabel(spec), fileName: buildFileName(spec) };
   errorMessage.textContent = '';
   previewStatus.textContent = '';
@@ -100,7 +100,7 @@ function explainInvalidField(error) {
 function generateLabel(event) {
   event.preventDefault();
   try {
-    showLabel(readLabelSpec(readFormFields()));
+    rememberAndShowLabel(readLabelSpec(readFormFields()));
   } catch (error) {
     if (!(error instanceof LabelSpecError)) {
       throw error;

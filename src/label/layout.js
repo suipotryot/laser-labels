@@ -36,5 +36,5 @@ export function computeLayout(size) {
   if (isTallerThanWide(size)) {
     return { orientation: 'stacked', ...splitOneAboveTheOther(inner, margin) };
   }
-  return { orientation: 'landscape', ...splitSideBySide(inner, margin) };
+  return { orientation: 'sideBySide', ...splitSideBySide(inner, margin) };
 }

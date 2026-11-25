@@ -1,5 +1,5 @@
 import { computeLayout } from './layout.js';
-import { labelLines } from './labelLines.js';
+import { listLabelLines } from './listLabelLines.js';
 
 const STROKE_WIDTH = 0.1;
 const FRAME_CORNER_RATIO = 0.1;
@@ -61,5 +61,5 @@ function renderSvg({ width, height }, content) {
 
 export function renderLabel(spec) {
   const { textZone } = computeLayout(spec);
-  return renderSvg(spec, renderOptionalFrame(spec) + renderTextLines(labelLines(spec), textZone));
+  return renderSvg(spec, renderOptionalFrame(spec) + renderTextLines(listLabelLines(spec), textZone));
 }

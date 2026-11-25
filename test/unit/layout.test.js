@@ -3,10 +3,10 @@ import assert from 'node:assert/strict';
 import { computeLayout, ICON_MAX_ASPECT_RATIO } from '../../src/label/layout.js';
 
 describe('computeLayout', () => {
-  it('should choose a landscape layout when the label is wider than tall', () => {
+  it('should choose a side-by-side layout when the label is wider than tall', () => {
     const layout = computeLayout({ width: 60, height: 20 });
 
-    assert.equal(layout.orientation, 'landscape');
+    assert.equal(layout.orientation, 'sideBySide');
   });
 
   it('should choose a stacked layout when the label is taller than wide', () => {
@@ -15,13 +15,13 @@ describe('computeLayout', () => {
     assert.equal(layout.orientation, 'stacked');
   });
 
-  it('should choose a landscape layout for a square label', () => {
+  it('should choose a side-by-side layout for a square label', () => {
     const layout = computeLayout({ width: 30, height: 30 });
 
-    assert.equal(layout.orientation, 'landscape');
+    assert.equal(layout.orientation, 'sideBySide');
   });
 
-  it('should place the icon zone left of the text zone in a landscape layout', () => {
+  it('should place the icon zone left of the text zone in a side-by-side layout', () => {
     const { iconZone, textZone } = computeLayout({ width: 60, height: 20 });
 
     assert.ok(iconZone.x + iconZone.width < textZone.x);

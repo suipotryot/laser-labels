@@ -1,4 +1,4 @@
-import { labelLines } from './labelLines.js';
+import { listLabelLines } from './listLabelLines.js';
 
 const FORBIDDEN_FILE_NAME_CHARACTERS = /[\\/:*?"<>|]/g;
 
@@ -7,6 +7,6 @@ function toFileNamePart(line) {
 }
 
 export function buildFileName(spec) {
-  const baseName = labelLines(spec).map(toFileNamePart).filter(Boolean).join('-').toLowerCase();
+  const baseName = listLabelLines(spec).map(toFileNamePart).filter(Boolean).join('-').toLowerCase();
   return `${baseName}.svg`;
 }

@@ -1,5 +1,5 @@
 import { findHardwareType } from '../catalog/hardwareTypes.js';
-import { findDriveType } from '../catalog/driveTypes.js';
+import { findDriveType, NO_DRIVE } from '../catalog/driveTypes.js';
 
 export class LabelSpecError extends Error {
   constructor(field, reason) {
@@ -41,10 +41,7 @@ function readHardwareType(fields) {
   return hardwareType;
 }
 
-function readDrive(fields, hardwareType) {
-  if (fields.driveType === '') {
-    return null;
-  }
+function readDriveType(fields, hardwareType) {
   if (!hardwareType.hasDrive) {
     throw new LabelSpecError('driveType', 'notApplicable');
   }
@@ -52,10 +49,22 @@ function readDrive(fields, hardwareType) {
   if (!driveType) {
     throw new LabelSpecError('driveType', 'unknown');
   }
+  return driveType;
+}
+
+function readDriveSize(fields, driveType) {
   if (!driveType.sizes.includes(fields.driveSize)) {
     throw new LabelSpecError('driveSize', 'unknown');
   }
-  return { type: driveType.key, size: fields.driveSize };
+  return fields.driveSize;
+}
+
+function readDrive(fields, hardwareType) {
+  if (fields.driveType === NO_DRIVE) {
+    return null;
+  }
+  const driveType = readDriveType(fields, hardwareType);
+  return { type: driveType.key, size: readDriveSize(fields, driveType) };
 }
 
 const CONTROL_CHARACTERS = /\p{Cc}/u;
