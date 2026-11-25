@@ -1,0 +1,149 @@
+:root {
+  --bg: #f7f7f8;
+  --surface: #ffffff;
+  --text: #1a1a1a;
+  --text-muted: #5b5b5b;
+  --accent: #2f6fed;
+  --border: #e2e2e6;
+  --error: #c62828;
+  --radius: 12px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #121214;
+    --surface: #1c1c1f;
+    --text: #f2f2f3;
+    --text-muted: #a3a3a8;
+    --accent: #6d9bff;
+    --border: #2c2c30;
+    --error: #ff6b6b;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+header {
+  padding: 2rem 1.5rem 1rem;
+  text-align: center;
+}
+
+header h1 {
+  margin: 0;
+}
+
+.subtitle {
+  color: var(--text-muted);
+}
+
+main {
+  display: grid;
+  grid-template-columns: minmax(16rem, 22rem) 1fr;
+  gap: 1.5rem;
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: 0 1.5rem 2rem;
+}
+
+@media (max-width: 48rem) {
+  main {
+    grid-template-columns: 1fr;
+  }
+}
+
+form,
+.result {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem;
+}
+
+fieldset {
+  border: none;
+  margin: 0 0 1rem;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+fieldset[hidden] {
+  display: none;
+}
+
+legend {
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+label {
+  display: grid;
+  gap: 0.25rem;
+  color: var(--text-muted);
+}
+
+label:has(input[type="checkbox"]) {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+input,
+select,
+button {
+  font: inherit;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+}
+
+button {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+#error-message {
+  color: var(--error);
+  min-height: 1.5em;
+  margin: 0 0 0.5rem;
+}
+
+#preview-status {
+  color: var(--text-muted);
+  margin: 0 0 0.5rem;
+}
+
+#preview {
+  margin-bottom: 1rem;
+}
+
+#preview.is-outdated {
+  opacity: 0.4;
+}
+
+#preview svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 60vh;
+  background: #fff;
+  border-radius: 6px;
+}
