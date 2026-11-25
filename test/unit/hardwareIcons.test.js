@@ -239,22 +239,29 @@ describe('drawHardwareIcon', () => {
     assert.ok(rungs.length > 4, 'no rungs between the rails');
   });
 
-  it('should draw a Molly anchor lying with a head and a tall thin flange on the left, a slotted sleeve and a flat end', () => {
-    const { outline } = drawHardwareIcon('mollyAnchor');
+  it('should draw a Molly anchor lying with a head, a spiked flange, a sleeve split into three strips and a threaded cone', () => {
+    const { outline, strokes } = drawHardwareIcon('mollyAnchor');
 
-    const [body, slot, ...others] = contoursOf(outline);
-    assert.equal(others.length, 0);
+    const [body, ...slots] = contoursOf(outline);
     const points = onCurvePointsOf(body);
     const extent = extentOf(points);
     const length = extent.right - extent.left;
     assert.ok(length > 3 * (extent.bottom - extent.top), 'the Molly anchor is not lying');
     const flangePoints = points.filter(({ y }) => isAlmostEqual(y, extent.top));
-    assert.ok(Math.max(...flangePoints.map(({ x }) => x)) < extent.left + length / 6, 'no flange on the left');
+    const flangeEnd = Math.max(...flangePoints.map(({ x }) => x));
+    assert.ok(flangeEnd < extent.left + length / 6, 'no flange on the left');
     assert.ok(Math.min(...flangePoints.map(({ x }) => x)) > extent.left, 'no head before the flange');
+    const spikeTips = points.filter(({ x, y }) => x > flangeEnd && Math.abs(y) > (extent.bottom - extent.top) / 3 && x < extent.left + length / 4);
+    assert.ok(spikeTips.length >= 2, 'no spikes on the flange');
     assert.equal(cornersAt(points, extent.right).length, 2, 'the end is not flat');
-    assert.notEqual(windingOf(slot), windingOf(body), 'the slot would be filled');
-    const slotExtent = extentOf(onCurvePointsOf(slot));
-    assert.ok(slotExtent.right - slotExtent.left > 5 * (slotExtent.bottom - slotExtent.top), 'the slot is not long along the sleeve');
+    assert.equal(slots.length, 2, 'the sleeve is not split into three strips');
+    for (const slot of slots) {
+      assert.notEqual(windingOf(slot), windingOf(body), 'a slot would be filled');
+      const slotExtent = extentOf(onCurvePointsOf(slot));
+      assert.ok(slotExtent.right - slotExtent.left > 5 * (slotExtent.bottom - slotExtent.top), 'a slot is not long along the sleeve');
+    }
+    const coneThreads = strokesOf(strokes).filter(([start, end]) => isAlmostEqual(start.x, end.x) && start.x > extent.right - length / 8);
+    assert.ok(coneThreads.length >= 2, 'no threads on the cone');
   });
 
   it('should draw a nut seen from the front as a hexagon with a hollow round hole, without strokes', () => {

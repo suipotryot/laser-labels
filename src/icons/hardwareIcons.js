@@ -89,18 +89,23 @@ const WALL_PLUG = {
   end: 3.1,
 };
 const MOLLY_ANCHOR = {
-  headRadius: 0.32,
-  headRounding: 0.12,
+  headRadius: 0.36,
+  headRounding: 0.16,
   headDepth: 0.25,
   flangeRadius: 0.5,
-  flangeEnd: 0.35,
-  sleeveRadius: 0.24,
-  slotStart: 0.9,
-  slotEnd: 2.4,
-  slotHalfWidth: 0.07,
-  coneStart: 2.9,
-  endRadius: 0.15,
-  end: 3.2,
+  flangeEnd: 0.37,
+  spikeRoot: 0.4,
+  spikeHalfWidth: 0.05,
+  spikeLength: 0.14,
+  sleeveRadius: 0.28,
+  slotStart: 0.85,
+  slotEnd: 2.8,
+  slotCenter: 0.13,
+  slotHalfWidth: 0.05,
+  coneStart: 3.15,
+  endRadius: 0.18,
+  end: 3.55,
+  coneThreadPitch: 0.1,
 };
 const TOP = -1;
 const BOTTOM = 1;
@@ -327,34 +332,51 @@ function drawWallPlug() {
   };
 }
 
+function flangeSpike(side) {
+  return [
+    atSide(MOLLY_ANCHOR.flangeEnd, MOLLY_ANCHOR.spikeRoot + MOLLY_ANCHOR.spikeHalfWidth, side),
+    atSide(MOLLY_ANCHOR.flangeEnd + MOLLY_ANCHOR.spikeLength, MOLLY_ANCHOR.spikeRoot, side),
+    atSide(MOLLY_ANCHOR.flangeEnd, MOLLY_ANCHOR.spikeRoot - MOLLY_ANCHOR.spikeHalfWidth, side),
+  ];
+}
+
 function mollyAnchorEdge(side) {
   return [
     { ...atSide(0, MOLLY_ANCHOR.headRadius, side), rounding: MOLLY_ANCHOR.headRounding },
     atSide(MOLLY_ANCHOR.headDepth, MOLLY_ANCHOR.headRadius, side),
     atSide(MOLLY_ANCHOR.headDepth, MOLLY_ANCHOR.flangeRadius, side),
     atSide(MOLLY_ANCHOR.flangeEnd, MOLLY_ANCHOR.flangeRadius, side),
+    ...flangeSpike(side),
     atSide(MOLLY_ANCHOR.flangeEnd, MOLLY_ANCHOR.sleeveRadius, side),
     atSide(MOLLY_ANCHOR.coneStart, MOLLY_ANCHOR.sleeveRadius, side),
     atSide(MOLLY_ANCHOR.end, MOLLY_ANCHOR.endRadius, side),
   ];
 }
 
-function expansionSlot() {
+function expansionSlot(side) {
   const halfWidth = MOLLY_ANCHOR.slotHalfWidth;
+  const slotEdge = (offset) => side * MOLLY_ANCHOR.slotCenter + offset;
   return hollow(polygonWithRoundedCorners([
-    { ...atSide(MOLLY_ANCHOR.slotStart, halfWidth, TOP), rounding: halfWidth },
-    { ...atSide(MOLLY_ANCHOR.slotEnd, halfWidth, TOP), rounding: halfWidth },
-    { ...atSide(MOLLY_ANCHOR.slotEnd, halfWidth, BOTTOM), rounding: halfWidth },
-    { ...atSide(MOLLY_ANCHOR.slotStart, halfWidth, BOTTOM), rounding: halfWidth },
+    { x: MOLLY_ANCHOR.slotStart, y: slotEdge(-halfWidth), rounding: halfWidth },
+    { x: MOLLY_ANCHOR.slotEnd, y: slotEdge(-halfWidth), rounding: halfWidth },
+    { x: MOLLY_ANCHOR.slotEnd, y: slotEdge(halfWidth), rounding: halfWidth },
+    { x: MOLLY_ANCHOR.slotStart, y: slotEdge(halfWidth), rounding: halfWidth },
   ]));
+}
+
+function coneThreads() {
+  const firstThread = MOLLY_ANCHOR.coneStart + MOLLY_ANCHOR.coneThreadPitch;
+  return evenlySpacedPositions({ from: firstThread, to: MOLLY_ANCHOR.end - MOLLY_ANCHOR.coneThreadPitch, pitch: MOLLY_ANCHOR.coneThreadPitch })
+    .flatMap((x) => verticalStroke(x, MOLLY_ANCHOR.endRadius));
 }
 
 function drawMollyAnchor() {
   return {
-    outline: [...mirroredOutline(mollyAnchorEdge), ...expansionSlot()],
+    outline: [...mirroredOutline(mollyAnchorEdge), ...expansionSlot(TOP), ...expansionSlot(BOTTOM)],
     strokes: [
       ...verticalStroke(MOLLY_ANCHOR.flangeEnd, MOLLY_ANCHOR.sleeveRadius),
       ...verticalStroke(MOLLY_ANCHOR.coneStart, MOLLY_ANCHOR.sleeveRadius),
+      ...coneThreads(),
     ],
   };
 }
@@ -370,7 +392,7 @@ const HARDWARE_DRAWINGS = {
   wallPlug: { draw: drawWallPlug, thinnestDetail: Math.min(WALL_PLUG.finRise, WALL_PLUG.railRadius * 2) },
   mollyAnchor: {
     draw: drawMollyAnchor,
-    thinnestDetail: Math.min(MOLLY_ANCHOR.flangeEnd - MOLLY_ANCHOR.headDepth, 2 * MOLLY_ANCHOR.slotHalfWidth),
+    thinnestDetail: Math.min(MOLLY_ANCHOR.flangeEnd - MOLLY_ANCHOR.headDepth, 2 * MOLLY_ANCHOR.slotHalfWidth, MOLLY_ANCHOR.coneThreadPitch),
   },
   eyeScrew: {
     draw: drawEyeScrew,
