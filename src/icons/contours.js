@@ -1,13 +1,14 @@
-const CIRCLE_ARC_HANDLE_RATIO = 0.5523;
-const PARALLEL_TOLERANCE = 1e-9;
-const FLOATING_POINT_TOLERANCE = 1e-9;
+export const FLOATING_POINT_TOLERANCE = 1e-9;
+export const QUARTER_TURN = Math.PI / 2;
+export const HALF_TURN = Math.PI;
+export const FULL_TURN = 2 * Math.PI;
 
 export function polyline(points) {
   const [first, ...others] = points;
   return [{ type: 'M', x: first.x, y: first.y }, ...others.map(({ x, y }) => ({ type: 'L', x, y }))];
 }
 
-export function polygon(corners) {
+function polygon(corners) {
   return [...polyline(corners), { type: 'Z' }];
 }
 
@@ -96,7 +97,7 @@ function determinant(first, second) {
 
 function intersectionOf(firstLine, secondLine) {
   const crossing = determinant(firstLine.direction, secondLine.direction);
-  if (Math.abs(crossing) < PARALLEL_TOLERANCE) {
+  if (Math.abs(crossing) < FLOATING_POINT_TOLERANCE) {
     throw new Error('Cannot join two parallel arms');
   }
   const gap = { x: secondLine.point.x - firstLine.point.x, y: secondLine.point.y - firstLine.point.y };
@@ -149,17 +150,16 @@ export function pointOnCircle({ center, radius }, angle) {
   return { x: center.x + offset.x, y: center.y + offset.y };
 }
 
-function tangentAt(angle, length) {
+function tangentTowardsIncreasingAngle(angle, length) {
   return { x: -Math.sin(angle) * length, y: -Math.cos(angle) * length };
 }
 
-function quarterOrLessOfArc(circleOnScreen, fromAngle, toAngle) {
-  const sweep = toAngle - fromAngle;
-  const handle = (4 / 3) * Math.tan(sweep / 4) * circleOnScreen.radius;
-  const start = pointOnCircle(circleOnScreen, fromAngle);
-  const end = pointOnCircle(circleOnScreen, toAngle);
-  const startTangent = tangentAt(fromAngle, handle);
-  const endTangent = tangentAt(toAngle, handle);
+function arcPieceUpToAQuarter({ center, radius }, fromAngle, toAngle) {
+  const handle = (4 / 3) * Math.tan((toAngle - fromAngle) / 4) * radius;
+  const start = pointOnCircle({ center, radius }, fromAngle);
+  const end = pointOnCircle({ center, radius }, toAngle);
+  const startTangent = tangentTowardsIncreasingAngle(fromAngle, handle);
+  const endTangent = tangentTowardsIncreasingAngle(toAngle, handle);
   return {
     type: 'C',
     x1: start.x + startTangent.x,
@@ -171,33 +171,30 @@ function quarterOrLessOfArc(circleOnScreen, fromAngle, toAngle) {
   };
 }
 
-const QUARTER_TURN = Math.PI / 2;
-
-function quarterTurnsBetween(fromAngle, toAngle) {
-  const direction = Math.sign(toAngle - fromAngle);
-  const firstQuarter = direction > 0 ? Math.floor(fromAngle / QUARTER_TURN) + 1 : Math.ceil(fromAngle / QUARTER_TURN) - 1;
-  const quarters = [];
-  for (let quarter = firstQuarter; direction * (toAngle - quarter * QUARTER_TURN) > FLOATING_POINT_TOLERANCE; quarter += direction) {
-    quarters.push(quarter * QUARTER_TURN);
+function quarterTurnAnglesStrictlyBetween(fromAngle, toAngle) {
+  const low = Math.min(fromAngle, toAngle);
+  const high = Math.max(fromAngle, toAngle);
+  const angles = [];
+  for (let angle = Math.ceil(low / QUARTER_TURN) * QUARTER_TURN; angle < high - FLOATING_POINT_TOLERANCE; angle += QUARTER_TURN) {
+    if (angle > low + FLOATING_POINT_TOLERANCE) {
+      angles.push(angle);
+    }
   }
-  return quarters;
+  return fromAngle < toAngle ? angles : angles.reverse();
 }
 
 export function arc({ center, radius, fromAngle, toAngle }) {
-  const angles = [fromAngle, ...quarterTurnsBetween(fromAngle, toAngle), toAngle];
-  return angles.slice(1).map((angle, index) => quarterOrLessOfArc({ center, radius }, angles[index], angle));
+  const angles = [fromAngle, ...quarterTurnAnglesStrictlyBetween(fromAngle, toAngle), toAngle];
+  return angles.slice(1).map((angle, index) => arcPieceUpToAQuarter({ center, radius }, angles[index], angle));
+}
+
+export function circleAround(center, radius) {
+  const start = pointOnCircle({ center, radius }, 0);
+  return [{ type: 'M', ...start }, ...arc({ center, radius, fromAngle: 0, toAngle: -FULL_TURN }), { type: 'Z' }];
 }
 
 export function circle(radius) {
-  const handle = radius * CIRCLE_ARC_HANDLE_RATIO;
-  return [
-    { type: 'M', x: radius, y: 0 },
-    { type: 'C', x1: radius, y1: handle, x2: handle, y2: radius, x: 0, y: radius },
-    { type: 'C', x1: -handle, y1: radius, x2: -radius, y2: handle, x: -radius, y: 0 },
-    { type: 'C', x1: -radius, y1: -handle, x2: -handle, y2: -radius, x: 0, y: -radius },
-    { type: 'C', x1: handle, y1: -radius, x2: radius, y2: -handle, x: radius, y: 0 },
-    { type: 'Z' },
-  ];
+  return circleAround({ x: 0, y: 0 }, radius);
 }
 
 const COORDINATE_PAIRS = [['x', 'y'], ['x1', 'y1'], ['x2', 'y2']];
@@ -265,7 +262,7 @@ function isClockwiseOnScreen(contour) {
   return signedAreaOnScreen(contour) > 0;
 }
 
-function reversedSegment(segment, start) {
+export function reversedSegment(segment, start) {
   const end = { x: start.x, y: start.y };
   if (segment.type === 'L') {
     return { type: 'L', ...end };
