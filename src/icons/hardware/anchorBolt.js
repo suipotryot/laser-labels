@@ -1,15 +1,22 @@
 import { polyline } from '../contours.js';
-import { BOTTOM, TOP, atSide, mirroredOutline, onAxis, threadReachOf, verticalStroke, verticalStrokesAlong } from './lyingPiece.js';
+import {
+  atSide,
+  hexagonFaceEdgeDistanceFromAxis,
+  mirroredHorizontalStrokes,
+  mirroredOutline,
+  onAxis,
+  straightThreadStrokes,
+  verticalStroke,
+} from './lyingPiece.js';
 
 const ANCHOR_BOLT = {
   shankRadius: 0.2,
   chamfer: 0.06,
   nutStart: 0.45,
   nutEnd: 0.9,
-  nutRadius: 0.42,
-  nutFaceEdgeHeight: 0.42 * Math.cos(Math.PI / 3),
+  nutRadius: 0.5,
   washerEnd: 1,
-  washerRadius: 0.52,
+  washerRadius: 0.6,
   threadOverhang: 0.05,
   threadPitch: 0.13,
   threadEnd: 2.3,
@@ -19,6 +26,11 @@ const ANCHOR_BOLT = {
   coneEndRadius: 0.3,
   end: 4.1,
 };
+
+const NUT_FACE_EDGE_DISTANCE_FROM_AXIS = hexagonFaceEdgeDistanceFromAxis(ANCHOR_BOLT.nutRadius);
+const WASHER_THICKNESS = ANCHOR_BOLT.washerEnd - ANCHOR_BOLT.nutEnd;
+const CLIP_STEP = ANCHOR_BOLT.clipRadius - ANCHOR_BOLT.shankRadius;
+const GAP_BETWEEN_NUT_FACE_EDGE_AND_SHANK = NUT_FACE_EDGE_DISTANCE_FROM_AXIS - ANCHOR_BOLT.shankRadius;
 
 function anchorBoltEdge(side) {
   return [
@@ -38,39 +50,40 @@ function anchorBoltEdge(side) {
   ];
 }
 
-function nutFaceEdges() {
-  return [TOP, BOTTOM].flatMap((side) => polyline([
-    atSide(ANCHOR_BOLT.nutStart, ANCHOR_BOLT.nutFaceEdgeHeight, side),
-    atSide(ANCHOR_BOLT.nutEnd, ANCHOR_BOLT.nutFaceEdgeHeight, side),
-  ]));
+function nutStrokes() {
+  const faceEdges = mirroredHorizontalStrokes({ from: ANCHOR_BOLT.nutStart, to: ANCHOR_BOLT.nutEnd, distanceFromAxis: NUT_FACE_EDGE_DISTANCE_FROM_AXIS });
+  const nutEndLine = verticalStroke(ANCHOR_BOLT.nutEnd, ANCHOR_BOLT.nutRadius);
+  return [...faceEdges, ...nutEndLine];
 }
 
-function studThreadStrokes() {
-  const halfLength = threadReachOf(ANCHOR_BOLT);
-  return [
-    ...verticalStrokesAlong({ from: ANCHOR_BOLT.chamfer, to: ANCHOR_BOLT.nutStart - ANCHOR_BOLT.threadPitch / 2, pitch: ANCHOR_BOLT.threadPitch, halfLength }),
-    ...verticalStrokesAlong({ from: ANCHOR_BOLT.washerEnd + ANCHOR_BOLT.threadPitch, to: ANCHOR_BOLT.threadEnd, pitch: ANCHOR_BOLT.threadPitch, halfLength }),
-  ];
+function threadsBeforeTheNut() {
+  return straightThreadStrokes(ANCHOR_BOLT, { from: ANCHOR_BOLT.chamfer, to: ANCHOR_BOLT.nutStart - ANCHOR_BOLT.threadPitch });
 }
 
-function clipSlit() {
-  return polyline([onAxis(ANCHOR_BOLT.clipStart), onAxis(ANCHOR_BOLT.clipEnd)]);
+function threadsAfterTheWasher() {
+  return straightThreadStrokes(ANCHOR_BOLT, { from: ANCHOR_BOLT.washerEnd + ANCHOR_BOLT.threadPitch, to: ANCHOR_BOLT.threadEnd });
+}
+
+function clipStrokes() {
+  const slit = polyline([onAxis(ANCHOR_BOLT.clipStart), onAxis(ANCHOR_BOLT.clipEnd)]);
+  const clipEndLine = verticalStroke(ANCHOR_BOLT.clipEnd, ANCHOR_BOLT.shankRadius);
+  return [...slit, ...clipEndLine];
 }
 
 function drawAnchorBolt() {
   return {
     outline: mirroredOutline(anchorBoltEdge),
-    strokes: [
-      ...nutFaceEdges(),
-      ...verticalStroke(ANCHOR_BOLT.nutEnd, ANCHOR_BOLT.nutRadius),
-      ...studThreadStrokes(),
-      ...clipSlit(),
-      ...verticalStroke(ANCHOR_BOLT.clipEnd, ANCHOR_BOLT.shankRadius),
-    ],
+    strokes: [...nutStrokes(), ...threadsBeforeTheNut(), ...threadsAfterTheWasher(), ...clipStrokes()],
   };
 }
 
 export const anchorBolt = {
   draw: drawAnchorBolt,
-  thinnestDetail: Math.min(ANCHOR_BOLT.chamfer, ANCHOR_BOLT.washerEnd - ANCHOR_BOLT.nutEnd, ANCHOR_BOLT.threadPitch),
+  thinnestDetail: Math.min(
+    ANCHOR_BOLT.chamfer,
+    WASHER_THICKNESS,
+    ANCHOR_BOLT.threadPitch,
+    CLIP_STEP,
+    GAP_BETWEEN_NUT_FACE_EDGE_AND_SHANK,
+  ),
 };

@@ -1,5 +1,4 @@
-import { polyline } from '../contours.js';
-import { BOTTOM, TOP, atSide, mirroredOutline, verticalStroke } from './lyingPiece.js';
+import { atSide, mirroredHorizontalStrokes, mirroredOutline, verticalStroke } from './lyingPiece.js';
 
 const RIVET = {
   mandrelRadius: 0.07,
@@ -8,9 +7,14 @@ const RIVET = {
   flangeRadius: 0.45,
   bodyRadius: 0.2,
   bodyEnd: 3,
-  mandrelHeadRadius: 0.1,
+  mandrelHeadRadius: 0.14,
   end: 3.12,
 };
+
+const FLANGE_THICKNESS = RIVET.flangeEnd - RIVET.flangeStart;
+const STEP_FROM_BODY_TO_MANDREL_HEAD = RIVET.bodyRadius - RIVET.mandrelHeadRadius;
+const MANDREL_HEAD_RIM = RIVET.mandrelHeadRadius - RIVET.mandrelRadius;
+const MANDREL_HEAD_LENGTH = RIVET.end - RIVET.bodyEnd;
 
 function rivetEdge(side) {
   return [
@@ -26,17 +30,24 @@ function rivetEdge(side) {
 }
 
 function mandrelThroughTheBody() {
-  return [TOP, BOTTOM].flatMap((side) => polyline([
-    atSide(RIVET.flangeEnd, RIVET.mandrelRadius, side),
-    atSide(RIVET.bodyEnd, RIVET.mandrelRadius, side),
-  ]));
+  return mirroredHorizontalStrokes({ from: RIVET.flangeEnd, to: RIVET.bodyEnd, distanceFromAxis: RIVET.mandrelRadius });
+}
+
+function partingLines() {
+  return [...verticalStroke(RIVET.flangeEnd, RIVET.bodyRadius), ...verticalStroke(RIVET.bodyEnd, RIVET.mandrelHeadRadius)];
 }
 
 function drawRivet() {
-  return {
-    outline: mirroredOutline(rivetEdge),
-    strokes: [...verticalStroke(RIVET.flangeEnd, RIVET.bodyRadius), ...mandrelThroughTheBody()],
-  };
+  return { outline: mirroredOutline(rivetEdge), strokes: [...partingLines(), ...mandrelThroughTheBody()] };
 }
 
-export const rivet = { draw: drawRivet, thinnestDetail: Math.min(RIVET.flangeEnd - RIVET.flangeStart, 2 * RIVET.mandrelRadius) };
+export const rivet = {
+  draw: drawRivet,
+  thinnestDetail: Math.min(
+    FLANGE_THICKNESS,
+    2 * RIVET.mandrelRadius,
+    STEP_FROM_BODY_TO_MANDREL_HEAD,
+    MANDREL_HEAD_RIM,
+    MANDREL_HEAD_LENGTH,
+  ),
+};
