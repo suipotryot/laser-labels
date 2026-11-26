@@ -4,8 +4,8 @@ import { aspectRatioOfHardwareIcon, drawHardwareIcon, thinnestHardwareDetail } f
 import { hardwareTypes } from '../../src/catalog/hardwareTypes.js';
 import { contoursOf, cornersOf, extentOf, isAlmostEqual, onCurvePointsOf, windingOf } from './helpers/geometry.js';
 
-const HARDWARE_SEEN_FROM_THE_FRONT = ['nut'];
-const HARDWARE_WITH_HOLES = ['nut', 'eyeScrew', 'mollyAnchor'];
+const HARDWARE_SEEN_FROM_THE_FRONT = ['nut', 'washer'];
+const HARDWARE_WITH_HOLES = ['nut', 'washer', 'eyeScrew', 'mollyAnchor'];
 
 function silhouetteOf(hardwareTypeKey) {
   const { outline, strokes } = drawHardwareIcon(hardwareTypeKey);
@@ -420,6 +420,20 @@ describe('drawHardwareIcon', () => {
     assert.ok(lineAtFlangeStart, 'no line between the head and the flange');
     assert.ok(isAlmostEqual(verticalSpanOf(lineAtFlangeStart), 2 * headRadius), 'the line does not span exactly the head');
     assert.ok(verticalLineAt(molly.strokes, flange.end), 'no line between the flange and the sleeve');
+  });
+
+  it('should draw a washer seen from the front as a round disc with a hollow round hole, without strokes', () => {
+    const { outline, strokes } = drawHardwareIcon('washer');
+
+    const [disc, hole, ...others] = contoursOf(outline);
+    assert.equal(others.length, 0);
+    for (const contour of [disc, hole]) {
+      const extent = extentOf(onCurvePointsOf(contour));
+      assert.ok(contour.some(({ type }) => type === 'C'), 'a contour is not round');
+      assert.ok(isAlmostEqual(lengthOf(extent), heightOf(extent)), 'a contour is not a circle');
+    }
+    assert.notEqual(windingOf(hole), windingOf(disc), 'the hole would be filled');
+    assert.equal(strokes.length, 0);
   });
 
   it('should draw a nut seen from the front as a hexagon with a hollow round hole, without strokes', () => {
