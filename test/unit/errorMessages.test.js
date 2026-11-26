@@ -35,6 +35,8 @@ describe('describeLabelSpecError', () => {
       ['dimensions', 'tooLong'],
       ['dimensions', 'nonPrintableCharacters'],
       ['dimensions', 'unengravableCharacters', { characters: ['→'] }],
+      ['usages', 'unknown'],
+      ['usages', 'duplicated'],
     ];
 
     for (const [field, reason, details] of raisableErrors) {

@@ -14,9 +14,30 @@ const validFields = {
   driveSize: 'PZ2',
   dimensions: '3,5x50',
   hasFrame: false,
+  usages: [],
 };
 
 describe('readLabelSpec', () => {
+  it('should read the usages ticked on the form', () => {
+    const spec = readLabelSpec({ ...validFields, usages: ['metal', 'outdoor'] }, font);
+
+    assert.deepEqual(spec.usages, ['metal', 'outdoor']);
+  });
+
+  it('should reject a usage that is not in the catalog', () => {
+    assert.throws(
+      () => readLabelSpec({ ...validFields, usages: ['metal', 'underwater'] }, font),
+      { name: 'LabelSpecError', field: 'usages', reason: 'unknown' },
+    );
+  });
+
+  it('should reject the same usage ticked twice', () => {
+    assert.throws(
+      () => readLabelSpec({ ...validFields, usages: ['metal', 'metal'] }, font),
+      { name: 'LabelSpecError', field: 'usages', reason: 'duplicated' },
+    );
+  });
+
   it('should read width and height as millimeter numbers', () => {
     const spec = readLabelSpec(validFields, font);
 

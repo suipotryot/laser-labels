@@ -15,6 +15,7 @@ const screwSpec = {
   drive: { type: 'pozidriv', size: 'PZ2' },
   dimensions: '3,5x50',
   hasFrame: false,
+  usages: [],
 };
 
 function throwOnParseError(level, message) {
@@ -184,6 +185,26 @@ describe('renderLabel', () => {
 
     assert.equal(pathsWithAttribute(svg, 'data-hardware-outline').length, 1);
     assert.equal(pathsWithAttribute(svg, 'data-hardware-strokes').length, 0);
+  });
+
+  it('should draw each ticked usage below the silhouette, inside the icon zone', () => {
+    const usagesSpec = { ...screwSpec, usages: ['metal', 'outdoor', 'masonry'] };
+    const { iconZone } = chooseLayout(usagesSpec, font);
+    const svg = parseSvg(renderLabel(usagesSpec, font));
+
+    const usagePaths = pathsWithAttribute(svg, 'data-usage-icon');
+    assert.deepEqual(usagePaths.map((path) => path.getAttribute('data-usage-icon')), ['metal', 'outdoor', 'masonry']);
+    const [silhouette] = pathsWithAttribute(svg, 'data-hardware-outline');
+    for (const point of usagePaths.flatMap(onCurvePointsOf)) {
+      assert.ok(isInsideZone(point, iconZone), `(${point.x}, ${point.y}) is outside the icon zone`);
+      assert.ok(point.y >= verticalSpanOf(silhouette).bottom, 'a usage is not below the silhouette');
+    }
+  });
+
+  it('should draw no usage icon when no usage is ticked', () => {
+    const svg = parseSvg(renderLabel(screwSpec, font));
+
+    assert.equal(pathsWithAttribute(svg, 'data-usage-icon').length, 0);
   });
 
   it('should draw no drive icon when there is no drive', () => {

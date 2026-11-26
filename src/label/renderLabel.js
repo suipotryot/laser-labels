@@ -6,6 +6,7 @@ import { escapeXml } from '../svg/escapeXml.js';
 import { hasLeadingIcon } from '../text/fitTextLines.js';
 import { drawDriveIconInCircle } from '../icons/driveIcons.js';
 import { placeHardwareIcon } from './placeHardwareIcon.js';
+import { placeUsageIcons } from './placeUsageIcons.js';
 
 const STROKE_WIDTH = 0.1;
 const FRAME_CORNER_RATIO = 0.1;
@@ -58,10 +59,18 @@ function renderHardwareIcon(spec, font) {
   return `<path data-hardware-outline="${escapeXml(spec.hardwareType)}" d="${pathData}"/>` + renderOptionalHardwareStrokes(spec.hardwareType, strokes);
 }
 
+function renderUsageIcon({ usage, outline }) {
+  return `<path data-usage-icon="${escapeXml(usage)}" d="${toSvgPathData(outline)}"/>`;
+}
+
+function renderUsageIcons(spec, font) {
+  return placeUsageIcons(spec, font).map(renderUsageIcon).join('');
+}
+
 function renderSvg({ width, height }, content) {
   return svgMarkup`<svg xmlns="http://www.w3.org/2000/svg" width="${width}mm" height="${height}mm" viewBox="0 0 ${width} ${height}" fill="none" stroke="#000" stroke-width="${STROKE_WIDTH}">${content}</svg>`;
 }
 
 export function renderLabel(spec, font) {
-  return renderSvg(spec, renderOptionalFrame(spec) + renderHardwareIcon(spec, font) + renderLines(spec, font));
+  return renderSvg(spec, renderOptionalFrame(spec) + renderHardwareIcon(spec, font) + renderUsageIcons(spec, font) + renderLines(spec, font));
 }

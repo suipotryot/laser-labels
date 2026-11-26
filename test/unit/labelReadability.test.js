@@ -12,6 +12,7 @@ const screwSpec = {
   drive: { type: 'pozidriv', size: 'PZ2' },
   dimensions: '3,5x50',
   hasFrame: false,
+  usages: [],
 };
 
 describe('hasDetailsTooSmallToEngrave', () => {
@@ -35,6 +36,17 @@ describe('hasDetailsTooSmallToEngrave', () => {
     const textlessSpec = { ...screwSpec, hardwareType: 'nut', drive: null, dimensions: '' };
 
     assert.equal(hasDetailsTooSmallToEngrave(textlessSpec, font), false);
+  });
+
+  it('should find a usage icon too detailed to engrave on a small label, even when everything else is readable', () => {
+    const smallNutSpec = { ...screwSpec, width: 30, height: 10, hardwareType: 'nut', drive: null, dimensions: '' };
+
+    assert.equal(hasDetailsTooSmallToEngrave(smallNutSpec, font), false);
+    assert.equal(hasDetailsTooSmallToEngrave({ ...smallNutSpec, usages: ['masonry'] }, font), true);
+  });
+
+  it('should find nothing too small on a usual label with every usage ticked', () => {
+    assert.equal(hasDetailsTooSmallToEngrave({ ...screwSpec, usages: ['metal', 'outdoor', 'masonry'] }, font), false);
   });
 
   it('should find a hardware silhouette too detailed to engrave on a tiny label', () => {

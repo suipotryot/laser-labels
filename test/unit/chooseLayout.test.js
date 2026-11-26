@@ -12,6 +12,7 @@ const screwSpec = {
   drive: { type: 'pozidriv', size: 'PZ2' },
   dimensions: '3,5x50',
   hasFrame: false,
+  usages: [],
 };
 
 describe('chooseLayout', () => {

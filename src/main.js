@@ -1,5 +1,6 @@
 import { hardwareTypes, findHardwareType } from './catalog/hardwareTypes.js';
 import { driveTypes, findDriveType, NO_DRIVE } from './catalog/driveTypes.js';
+import { usageTypes } from './catalog/usageTypes.js';
 import { readLabelSpec, LabelSpecError } from './label/labelSpec.js';
 import { describeLabelSpecError } from './label/errorMessages.js';
 import { renderLabel } from './label/renderLabel.js';
@@ -19,6 +20,7 @@ const heightInput = document.getElementById('height');
 const hasFrameCheckbox = document.getElementById('has-frame');
 const hardwareTypeSelect = document.getElementById('hardware-type');
 const dimensionsInput = document.getElementById('dimensions');
+const usageFields = document.getElementById('usage-fields');
 const driveFields = document.getElementById('drive-fields');
 const driveTypeSelect = document.getElementById('drive-type');
 const driveSizeSelect = document.getElementById('drive-size');
@@ -33,6 +35,23 @@ function toOption({ key, name }) {
 
 function populateHardwareTypes() {
   hardwareTypeSelect.replaceChildren(...hardwareTypes.map(toOption));
+}
+
+function toUsageCheckbox({ key, name }) {
+  const checkbox = document.createElement('input');
+  checkbox.type = 'checkbox';
+  checkbox.value = key;
+  const label = document.createElement('label');
+  label.append(checkbox, ` ${name}`);
+  return label;
+}
+
+function populateUsages() {
+  usageFields.append(...usageTypes.map(toUsageCheckbox));
+}
+
+function readTickedUsages() {
+  return Array.from(usageFields.querySelectorAll('input:checked'), (checkbox) => checkbox.value);
 }
 
 function populateDriveTypes() {
@@ -72,6 +91,7 @@ function readFormFields() {
     driveSize: driveSizeSelect.value,
     dimensions: dimensionsInput.value,
     hasFrame: hasFrameCheckbox.checked,
+    usages: readTickedUsages(),
   };
 }
 
@@ -155,6 +175,7 @@ function explainFontLoadingFailure(error) {
 }
 
 populateHardwareTypes();
+populateUsages();
 populateDriveTypes();
 populateDriveSizes();
 showDriveFieldsOnlyForHardwareWithDrive();

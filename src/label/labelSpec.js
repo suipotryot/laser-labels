@@ -1,5 +1,6 @@
 import { findHardwareType } from '../catalog/hardwareTypes.js';
 import { findDriveType, NO_DRIVE } from '../catalog/driveTypes.js';
+import { findUsageType } from '../catalog/usageTypes.js';
 
 export class LabelSpecError extends Error {
   constructor(field, reason, details = {}) {
@@ -106,6 +107,16 @@ function readDimensions(fields, font) {
   return dimensions;
 }
 
+function readUsages(fields) {
+  if (!fields.usages.every((usage) => findUsageType(usage))) {
+    throw new LabelSpecError('usages', 'unknown');
+  }
+  if (new Set(fields.usages).size !== fields.usages.length) {
+    throw new LabelSpecError('usages', 'duplicated');
+  }
+  return fields.usages;
+}
+
 export function readLabelSpec(fields, font) {
   const hardwareType = readHardwareType(fields);
   return {
@@ -115,5 +126,6 @@ export function readLabelSpec(fields, font) {
     drive: readDrive(fields, hardwareType),
     dimensions: readDimensions(fields, font),
     hasFrame: fields.hasFrame,
+    usages: readUsages(fields),
   };
 }
