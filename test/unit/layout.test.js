@@ -43,5 +43,4 @@ describe('computeLayout', () => {
 
     assert.ok(textZone.width > iconZone.width);
   });
-
 });

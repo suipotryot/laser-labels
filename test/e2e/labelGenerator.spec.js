@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { test, expect } from '@playwright/test';
+import { hardwareTypes } from '../../src/catalog/hardwareTypes.js';
 
 const FONT_LOADING_FAILURE_NOTICE = "La police de gravure n'a pas pu être chargée : rechargez la page.";
 const SMALL_DETAILS_NOTICE = "Certains détails sont très petits : ils risquent d'être illisibles une fois gravés.";
@@ -261,12 +262,14 @@ test.describe('preview', () => {
 });
 
 test.describe('hardware type select', () => {
-  test('should draw the silhouette of the chosen hardware', async ({ page }) => {
+  test('should draw the silhouette of every hardware type of the catalog', async ({ page }) => {
     await fillScrewLabel(page);
 
-    await page.getByLabel('Type de quincaillerie').selectOption({ label: 'Boulon' });
+    for (const { key, name } of hardwareTypes) {
+      await page.getByLabel('Type de quincaillerie').selectOption({ label: name });
 
-    await expect(previewSvgOf(page).locator('path[data-hardware-outline]')).toHaveAttribute('data-hardware-outline', 'bolt');
+      await expect(previewSvgOf(page).locator('path[data-hardware-outline]')).toHaveAttribute('data-hardware-outline', key);
+    }
   });
 
   test('should hide the drive fields for hardware without drive', async ({ page }) => {

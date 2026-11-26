@@ -4,24 +4,124 @@ import { aspectRatioOfHardwareIcon, drawHardwareIcon, thinnestHardwareDetail } f
 import { hardwareTypes } from '../../src/catalog/hardwareTypes.js';
 import { contoursOf, cornersOf, extentOf, isAlmostEqual, onCurvePointsOf, windingOf } from './helpers/geometry.js';
 
+const HARDWARE_SEEN_FROM_THE_FRONT = ['nut'];
+const HARDWARE_WITH_HOLES = ['nut', 'eyeScrew', 'mollyAnchor'];
 
-function cornersAt(corners, x) {
-  return corners.filter((corner) => isAlmostEqual(corner.x, x));
+function silhouetteOf(hardwareTypeKey) {
+  const { outline, strokes } = drawHardwareIcon(hardwareTypeKey);
+  const [body, ...holes] = contoursOf(outline);
+  const points = onCurvePointsOf(body);
+  return { body, holes, points, corners: cornersOf(body), extent: extentOf(points), strokes: contoursOf(strokes) };
+}
+
+function lengthOf(extent) {
+  return extent.right - extent.left;
+}
+
+function heightOf(extent) {
+  return extent.bottom - extent.top;
+}
+
+function fractionAlong(extent, fraction) {
+  return extent.left + lengthOf(extent) * fraction;
+}
+
+function isLying(extent) {
+  return lengthOf(extent) > 3 * heightOf(extent);
+}
+
+function pointsAt(points, x) {
+  return points.filter((point) => isAlmostEqual(point.x, x));
+}
+
+function isAboveAxis({ y }) {
+  return y < 0 && !isAlmostEqual(y, 0);
+}
+
+function distanceFromAxisOf({ y }) {
+  return Math.abs(y);
+}
+
+function tallestPointsOf({ points, extent }) {
+  return points.filter(({ y }) => isAlmostEqual(y, extent.top));
+}
+
+function hasPointedTipOnAxis({ points, extent }) {
+  const tip = pointsAt(points, extent.right);
+  return tip.length === 1 && isAlmostEqual(tip[0].y, 0);
+}
+
+function hasFlatEnd({ points, extent }) {
+  return pointsAt(points, extent.right).length === 2;
+}
+
+function shankRadiusOf(points) {
+  return Math.min(...points.filter(isAboveAxis).map(distanceFromAxisOf));
+}
+
+function shankEdgeOf(points) {
+  const shankRadius = shankRadiusOf(points);
+  return extentOf(points.filter(({ y }) => isAlmostEqual(y, -shankRadius)));
 }
 
 function shankStartOf(points) {
-  const shankRadius = Math.min(...points.filter(({ y }) => y < 0).map(({ y }) => -y));
-  return Math.min(...points.filter(({ y }) => isAlmostEqual(y, -shankRadius)).map(({ x }) => x));
+  return shankEdgeOf(points).left;
 }
 
-function strokesOf(commands) {
-  return contoursOf(commands).map((stroke) => stroke.map(({ x, y }) => ({ x, y })));
+function distinctValues(values) {
+  return values.filter((value, index) => !values.slice(0, index).some((earlier) => isAlmostEqual(earlier, value)));
 }
 
-function directionChangesAlong(corners, edgeIsTop) {
-  const edge = corners
-    .filter(({ y }) => (edgeIsTop ? y < 0 : y > 0))
-    .sort((first, second) => first.x - second.x);
+function sortedDistinctValues(values) {
+  return distinctValues(values).sort((first, second) => first - second);
+}
+
+function smallestGapBetween(sortedValues) {
+  return Math.min(...sortedValues.slice(1).map((value, index) => value - sortedValues[index]));
+}
+
+function stepsAlongTopEdge(points) {
+  const topEdge = points.filter(isAboveAxis);
+  return sortedDistinctValues(topEdge.map(({ x }) => x))
+    .map((x) => ({ x, distances: distinctValues(pointsAt(topEdge, x).map(distanceFromAxisOf)) }))
+    .filter(({ distances }) => distances.length >= 2)
+    .map(({ x, distances }) => ({ x, narrowerRadius: Math.min(...distances), stepHeight: Math.max(...distances) - Math.min(...distances) }));
+}
+
+function firstStepAlongTopEdge(points) {
+  return stepsAlongTopEdge(points)[0];
+}
+
+function isStraight(stroke) {
+  return stroke.length === 2;
+}
+
+function isVertical(stroke) {
+  return isStraight(stroke) && isAlmostEqual(stroke[0].x, stroke[1].x);
+}
+
+function isHorizontal(stroke) {
+  return isStraight(stroke) && isAlmostEqual(stroke[0].y, stroke[1].y);
+}
+
+function isDiagonal(stroke) {
+  return isStraight(stroke) && !isVertical(stroke) && !isHorizontal(stroke);
+}
+
+function verticalSpanOf([start, end]) {
+  return Math.abs(end.y - start.y);
+}
+
+function verticalLineAt(strokes, x) {
+  return strokes.find((stroke) => isVertical(stroke) && isAlmostEqual(stroke[0].x, x));
+}
+
+function crossesEdges([start, end], shankRadius) {
+  return Math.abs(start.y) > shankRadius && Math.abs(end.y) > shankRadius;
+}
+
+function directionChangesAlongTopEdge(corners) {
+  const edge = corners.filter(isAboveAxis).sort((first, second) => first.x - second.x);
   return edge.slice(1, -1).filter((corner, index) => {
     const previous = edge[index];
     const next = edge[index + 2];
@@ -29,10 +129,46 @@ function directionChangesAlong(corners, edgeIsTop) {
   }).length;
 }
 
+function distanceFromAxisAlong([from, to], x) {
+  const progress = (x - from.x) / (to.x - from.x);
+  return distanceFromAxisOf(from) + (distanceFromAxisOf(to) - distanceFromAxisOf(from)) * progress;
+}
+
+function gapBetweenParallelStrokes(first, second) {
+  const direction = { x: first[1].x - first[0].x, y: first[1].y - first[0].y };
+  const length = Math.hypot(direction.x, direction.y);
+  const offset = { x: second[0].x - first[0].x, y: second[0].y - first[0].y };
+  return Math.abs(offset.x * direction.y - offset.y * direction.x) / length;
+}
+
+function thinnestDetailOfThreadedShank({ points, strokes }) {
+  const [firstThread, secondThread] = strokes.filter(isDiagonal);
+  return Math.min(gapBetweenParallelStrokes(firstThread, secondThread), 2 * shankRadiusOf(points));
+}
+
+function collarEndOf(wallPlug) {
+  return firstStepAlongTopEdge(wallPlug.points).x;
+}
+
+function flangeOf(molly) {
+  const { left, right } = extentOf(tallestPointsOf(molly));
+  return { start: left, end: right };
+}
+
+function coneThreadsOf(molly) {
+  return molly.strokes.filter((stroke) => isVertical(stroke) && stroke[0].x > fractionAlong(molly.extent, 7 / 8));
+}
+
 describe('drawHardwareIcon', () => {
   it('should draw an outline for every hardware type of the catalog', () => {
     for (const { key } of hardwareTypes) {
       assert.ok(drawHardwareIcon(key).outline.length > 0, `no outline for ${key}`);
+    }
+  });
+
+  it('should draw every hardware type of the catalog lying, except those seen from the front', () => {
+    for (const { key } of hardwareTypes.filter(({ key }) => !HARDWARE_SEEN_FROM_THE_FRONT.includes(key))) {
+      assert.ok(isLying(silhouetteOf(key).extent), `${key} is not lying`);
     }
   });
 
@@ -44,6 +180,12 @@ describe('drawHardwareIcon', () => {
     }
   });
 
+  it('should draw every hardware type of the catalog without holes in a single contour', () => {
+    for (const { key } of hardwareTypes.filter(({ key }) => !HARDWARE_WITH_HOLES.includes(key))) {
+      assert.equal(contoursOf(drawHardwareIcon(key).outline).length, 1, `${key} is not drawn in a single contour`);
+    }
+  });
+
   it('should refuse a hardware type it cannot draw', () => {
     assert.throws(() => drawHardwareIcon('spaceship'), /No icon for hardware type: spaceship/);
   });
@@ -52,227 +194,232 @@ describe('drawHardwareIcon', () => {
     assert.throws(() => drawHardwareIcon('constructor'), /No icon for hardware type: constructor/);
   });
 
-  it('should draw a screw lying with its head on the left, straight edges, a pointed tip and diagonal threads crossing its edges', () => {
-    const { outline, strokes } = drawHardwareIcon('screw');
+  it('should draw a screw with its head as tall as the drawing on the left and a pointed tip', () => {
+    const screw = silhouetteOf('screw');
 
-    const [contour, ...others] = contoursOf(outline);
-    assert.equal(others.length, 0);
-    const corners = cornersOf(contour);
-    const extent = extentOf(corners);
-    assert.ok(extent.right - extent.left > 3 * (extent.bottom - extent.top), 'the screw is not lying');
-    const headCorners = cornersAt(corners, extent.left);
-    assert.deepEqual(extentOf(headCorners).top, extent.top);
-    assert.deepEqual(extentOf(headCorners).bottom, extent.bottom);
-    const tip = cornersAt(corners, extent.right);
-    assert.equal(tip.length, 1);
-    assert.ok(isAlmostEqual(tip[0].y, 0), 'the tip is not on the axis');
-    assert.equal(directionChangesAlong(corners, true), 0, 'the top edge is not straight');
-    const shankRadius = Math.min(...corners.filter(({ y }) => y < 0).map(({ y }) => -y));
-    const threads = strokesOf(strokes).filter(([start, end]) => !isAlmostEqual(start.x, end.x));
+    const head = extentOf(pointsAt(screw.corners, screw.extent.left));
+    assert.equal(head.top, screw.extent.top);
+    assert.equal(head.bottom, screw.extent.bottom);
+    assert.ok(hasPointedTipOnAxis(screw), 'the tip is not pointed on the axis');
+  });
+
+  it('should draw a screw with straight edges and diagonal threads crossing them', () => {
+    const screw = silhouetteOf('screw');
+
+    assert.equal(directionChangesAlongTopEdge(screw.corners), 0, 'the top edge is not straight');
+    const threads = screw.strokes.filter(isDiagonal);
     assert.ok(threads.length > 5, 'no thread strokes');
-    for (const [start, end] of threads) {
-      assert.ok(Math.abs(start.y) > shankRadius && Math.abs(end.y) > shankRadius, 'a thread stroke does not cross the edges');
-    }
+    assert.ok(threads.every((thread) => crossesEdges(thread, shankRadiusOf(screw.points))), 'a thread does not cross the edges');
   });
 
   it('should draw a line across the shank where the head of the screw ends', () => {
-    const { outline, strokes } = drawHardwareIcon('screw');
+    const screw = silhouetteOf('screw');
 
-    const corners = cornersOf(contoursOf(outline)[0]);
-    const shankCorners = corners.filter(({ y }) => y < 0 && !isAlmostEqual(y, extentOf(corners).top));
-    const headEnd = Math.min(...shankCorners.map(({ x }) => x));
-    const shankRadius = -shankCorners[0].y;
-    const lineAtHeadEnd = strokesOf(strokes).find(([start, end]) => isAlmostEqual(start.x, headEnd) && isAlmostEqual(end.x, headEnd));
+    const lineAtHeadEnd = verticalLineAt(screw.strokes, shankStartOf(screw.points));
     assert.ok(lineAtHeadEnd, 'no line where the head ends');
-    assert.ok(isAlmostEqual(Math.abs(lineAtHeadEnd[1].y - lineAtHeadEnd[0].y), 2 * shankRadius), 'the line does not span exactly the shank');
+    assert.ok(isAlmostEqual(verticalSpanOf(lineAtHeadEnd), 2 * shankRadiusOf(screw.points)), 'the line does not span exactly the shank');
   });
 
-  it('should draw a nail lying with a flat thin head on the left and a pointed tip', () => {
-    const { outline } = drawHardwareIcon('nail');
+  it('should draw a nail with a flat thin head on the left and a pointed tip', () => {
+    const nail = silhouetteOf('nail');
 
-    const [contour, ...others] = contoursOf(outline);
-    assert.equal(others.length, 0);
-    const points = onCurvePointsOf(contour);
-    const extent = extentOf(points);
-    const length = extent.right - extent.left;
-    assert.ok(length > 3 * (extent.bottom - extent.top), 'the nail is not lying');
-    const headPoints = points.filter(({ y }) => isAlmostEqual(y, extent.top) || isAlmostEqual(y, extent.bottom));
-    assert.ok(extentOf(headPoints).right - extent.left < length / 10, 'the head is not thin');
-    const tip = cornersAt(points, extent.right);
-    assert.equal(tip.length, 1);
-    assert.ok(isAlmostEqual(tip[0].y, 0), 'the tip is not on the axis');
+    assert.ok(extentOf(tallestPointsOf(nail)).right < fractionAlong(nail.extent, 1 / 10), 'the head is not thin');
+    assert.ok(hasPointedTipOnAxis(nail), 'the tip is not pointed on the axis');
   });
 
   it('should draw a line across the shank where the head of the nail ends', () => {
-    const { outline, strokes } = drawHardwareIcon('nail');
+    const nail = silhouetteOf('nail');
 
-    const points = onCurvePointsOf(contoursOf(outline)[0]);
-    const shankRadius = Math.min(...points.filter(({ y }) => y < 0).map(({ y }) => -y));
-    const headEnd = shankStartOf(points);
-    const lineAtHeadEnd = strokesOf(strokes).find(([start, end]) => isAlmostEqual(start.x, headEnd) && isAlmostEqual(end.x, headEnd));
+    const lineAtHeadEnd = verticalLineAt(nail.strokes, shankStartOf(nail.points));
     assert.ok(lineAtHeadEnd, 'no line where the head ends');
-    assert.ok(isAlmostEqual(Math.abs(lineAtHeadEnd[1].y - lineAtHeadEnd[0].y), 2 * shankRadius), 'the line does not span exactly the shank');
+    assert.ok(isAlmostEqual(verticalSpanOf(lineAtHeadEnd), 2 * shankRadiusOf(nail.points)), 'the line does not span exactly the shank');
   });
 
   it('should round the four corners of the nail head', () => {
-    const { outline } = drawHardwareIcon('nail');
+    const nail = silhouetteOf('nail');
 
-    const contour = contoursOf(outline)[0];
-    const extent = extentOf(onCurvePointsOf(contour));
-    const roundedHeadCorners = contour.filter(({ type, y1 }) => type === 'Q' && (isAlmostEqual(y1, extent.top) || isAlmostEqual(y1, extent.bottom)));
+    const isOnTheHeadSide = (y) => isAlmostEqual(y, nail.extent.top) || isAlmostEqual(y, nail.extent.bottom);
+    const roundedHeadCorners = nail.body.filter(({ type, y1 }) => type === 'Q' && isOnTheHeadSide(y1));
     assert.equal(roundedHeadCorners.length, 4);
   });
 
   it('should draw a curved bevel in the shape of a V inside the tip of the nail', () => {
-    const { outline, strokes } = drawHardwareIcon('nail');
+    const nail = silhouetteOf('nail');
 
-    const points = onCurvePointsOf(contoursOf(outline)[0]);
-    const tipEnd = extentOf(points).right;
-    const shankRadius = Math.min(...points.filter(({ y }) => y < 0).map(({ y }) => -y));
-    const bevel = contoursOf(strokes).find((stroke) => stroke.some(({ type }) => type === 'Q'));
+    const shankRadius = shankRadiusOf(nail.points);
+    const bevel = nail.strokes.find((stroke) => stroke.some(({ type }) => type === 'Q'));
     assert.ok(bevel, 'no curved bevel');
     const [start, ...rest] = bevel;
-    const end = rest.at(-1);
     const pointOfTheV = rest.find(({ y }) => isAlmostEqual(y, 0));
-    assert.ok(isAlmostEqual(start.y, -shankRadius) && isAlmostEqual(end.y, shankRadius), 'the bevel does not start and end on the edges');
-    assert.ok(pointOfTheV && pointOfTheV.x > start.x && pointOfTheV.x < tipEnd, 'the bevel does not point towards the tip');
+    assert.ok(isAlmostEqual(start.y, -shankRadius) && isAlmostEqual(rest.at(-1).y, shankRadius), 'the bevel does not start and end on the edges');
+    assert.ok(pointOfTheV && pointOfTheV.x > start.x && pointOfTheV.x < nail.extent.right, 'the bevel does not point towards the tip');
   });
 
   it('should draw six short notches on one side of the first third of the nail shank', () => {
-    const { outline, strokes } = drawHardwareIcon('nail');
+    const nail = silhouetteOf('nail');
 
-    const points = onCurvePointsOf(contoursOf(outline)[0]);
-    const shankRadius = Math.min(...points.filter(({ y }) => y < 0).map(({ y }) => -y));
-    const headEnd = shankStartOf(points);
-    const shankEnd = Math.max(...points.filter(({ y }) => isAlmostEqual(y, -shankRadius)).map(({ x }) => x));
+    const shankRadius = shankRadiusOf(nail.points);
+    const { left: headEnd, right: shankEnd } = shankEdgeOf(nail.points);
     const firstThirdEnd = headEnd + (shankEnd - headEnd) / 3;
-    const straightStrokes = strokesOf(strokes).filter((stroke) => stroke.length === 2);
-    const notches = straightStrokes.filter(([start, end]) => isAlmostEqual(start.y, -shankRadius) && end.y > start.y && end.y < shankRadius);
+    const notches = nail.strokes.filter((stroke) => isVertical(stroke) && isAlmostEqual(stroke[0].y, -shankRadius) && verticalSpanOf(stroke) < 2 * shankRadius);
     assert.equal(notches.length, 6);
     assert.ok(notches.every(([start]) => start.x > headEnd && start.x < firstThirdEnd), 'a notch is outside the first third of the shank');
   });
 
-  it('should draw a bolt lying with a hexagonal head on the left, a flat end and straight threads along all its shank', () => {
-    const { outline, strokes } = drawHardwareIcon('bolt');
+  it('should draw a bolt with only its hexagonal head as tall as the drawing and a flat end', () => {
+    const bolt = silhouetteOf('bolt');
 
-    const [contour, ...others] = contoursOf(outline);
-    assert.equal(others.length, 0);
-    const corners = cornersOf(contour);
-    const extent = extentOf(corners);
-    const length = extent.right - extent.left;
-    assert.ok(length > 3 * (extent.bottom - extent.top), 'the bolt is not lying');
-    const tallestCorners = corners.filter(({ y }) => isAlmostEqual(y, extent.top));
-    assert.ok(tallestCorners.every(({ x }) => x < extent.left + length / 4), 'something else than the head is as tall');
-    assert.equal(cornersAt(corners, extent.right).length, 2, 'the end is not flat');
-    const headEnd = Math.max(...tallestCorners.map(({ x }) => x));
-    const verticalStrokes = strokesOf(strokes).filter(([start, end]) => isAlmostEqual(start.x, end.x));
-    const shankRadius = Math.abs(cornersAt(corners, headEnd).find(({ y }) => !isAlmostEqual(y, extent.top) && y < 0).y);
-    const spanOf = ([start, end]) => Math.abs(end.y - start.y);
-    const lineBetweenHeadAndShank = verticalStrokes.find(([start]) => isAlmostEqual(start.x, headEnd));
-    assert.ok(lineBetweenHeadAndShank, 'no line between the head and the shank');
-    assert.ok(isAlmostEqual(spanOf(lineBetweenHeadAndShank), 2 * shankRadius), 'the line between head and shank goes over the outline');
-    assert.ok(verticalStrokes.some((stroke) => stroke[0].x < headEnd && isAlmostEqual(spanOf(stroke), extent.bottom - extent.top)), 'no line at the chamfered corner of the head');
-    const threads = verticalStrokes.filter(([start]) => start.x > headEnd);
-    assert.ok(threads.every(([start, end]) => Math.abs(start.y) > shankRadius && Math.abs(end.y) > shankRadius), 'threads do not cross the edges');
-    assert.ok(Math.min(...threads.map(([start]) => start.x)) < headEnd + length / 10, 'threads do not start near the head');
-    assert.ok(Math.max(...threads.map(([start]) => start.x)) > extent.right - length / 10, 'threads do not reach the end');
+    assert.ok(tallestPointsOf(bolt).every(({ x }) => x < fractionAlong(bolt.extent, 1 / 4)), 'something else than the head is as tall');
+    assert.ok(hasFlatEnd(bolt), 'the end is not flat');
   });
 
-  it('should draw an eye screw lying with a round eye on the left, joined to a pointed shank with diagonal threads', () => {
-    const { outline, strokes } = drawHardwareIcon('eyeScrew');
+  it('should draw a line at the chamfered corner of the bolt head and another across the shank where the head ends', () => {
+    const bolt = silhouetteOf('bolt');
 
-    const [body, hole, ...others] = contoursOf(outline);
+    const { x: headEnd, narrowerRadius: shankRadius } = firstStepAlongTopEdge(bolt.corners);
+    const lineAtHeadEnd = verticalLineAt(bolt.strokes, headEnd);
+    assert.ok(lineAtHeadEnd, 'no line between the head and the shank');
+    assert.ok(isAlmostEqual(verticalSpanOf(lineAtHeadEnd), 2 * shankRadius), 'the line between head and shank goes over the outline');
+    const chamferLine = bolt.strokes.find((stroke) => isVertical(stroke) && stroke[0].x < headEnd && isAlmostEqual(verticalSpanOf(stroke), heightOf(bolt.extent)));
+    assert.ok(chamferLine, 'no line at the chamfered corner of the head');
+  });
+
+  it('should draw straight threads crossing the edges along the whole bolt shank', () => {
+    const bolt = silhouetteOf('bolt');
+
+    const { x: headEnd, narrowerRadius: shankRadius } = firstStepAlongTopEdge(bolt.corners);
+    const threads = bolt.strokes.filter((stroke) => isVertical(stroke) && stroke[0].x > headEnd);
+    const threadSpan = extentOf(threads.flat());
+    assert.ok(threads.every((thread) => crossesEdges(thread, shankRadius)), 'threads do not cross the edges');
+    assert.ok(threadSpan.left < headEnd + lengthOf(bolt.extent) / 10, 'threads do not start near the head');
+    assert.ok(threadSpan.right > fractionAlong(bolt.extent, 9 / 10), 'threads do not reach the end');
+  });
+
+  it('should draw an eye screw with a round hollow eye on the left and a pointed tip', () => {
+    const eyeScrew = silhouetteOf('eyeScrew');
+
+    const [eyeHole, ...others] = eyeScrew.holes;
     assert.equal(others.length, 0);
-    assert.notEqual(windingOf(hole), windingOf(body), 'the eye would be filled');
-    const points = onCurvePointsOf(body);
-    const extent = extentOf(points);
-    assert.ok(extent.right - extent.left > 3 * (extent.bottom - extent.top), 'the eye screw is not lying');
-    assert.ok(body.some(({ type }) => type === 'C'), 'the eye is not round');
-    const tip = cornersAt(points, extent.right);
-    assert.equal(tip.length, 1);
-    assert.ok(isAlmostEqual(tip[0].y, 0), 'the tip is not on the axis');
-    const holeExtent = extentOf(onCurvePointsOf(hole));
-    assert.ok(holeExtent.right < extent.left + (extent.right - extent.left) / 3, 'the eye is not on the left');
-    const threads = strokesOf(strokes).filter(([start, end]) => !isAlmostEqual(start.x, end.x));
+    assert.notEqual(windingOf(eyeHole), windingOf(eyeScrew.body), 'the eye would be filled');
+    assert.ok(eyeScrew.body.some(({ type }) => type === 'C'), 'the eye is not round');
+    assert.ok(extentOf(onCurvePointsOf(eyeHole)).right < fractionAlong(eyeScrew.extent, 1 / 3), 'the eye is not on the left');
+    assert.ok(hasPointedTipOnAxis(eyeScrew), 'the tip is not pointed on the axis');
+  });
+
+  it('should draw diagonal threads on the shank of the eye screw', () => {
+    assert.ok(silhouetteOf('eyeScrew').strokes.filter(isDiagonal).length > 5, 'no diagonal threads');
+  });
+
+  it('should draw a screw hook in a single contour with a round loop rising above a pointed shank', () => {
+    const hook = silhouetteOf('hook');
+
+    assert.equal(hook.holes.length, 0);
+    assert.ok(hook.body.some(({ type }) => type === 'C'), 'the hook is not curved');
+    assert.ok(hook.extent.top < -3 * shankRadiusOf(hook.points), 'the hook does not rise above the shank');
+    assert.ok(!hook.body.some(({ type, y }) => type === 'L' && y < -2 * shankRadiusOf(hook.points)), 'the hook has a straight part');
+    assert.ok(hasPointedTipOnAxis(hook), 'the tip is not pointed on the axis');
+  });
+
+  it('should center the screw hook shank between the top and the bottom of its loop', () => {
+    const hook = silhouetteOf('hook');
+
+    assert.ok(isAlmostEqual(hook.extent.top, -hook.extent.bottom), 'the shank is not centered on the loop');
+  });
+
+  it('should put a collar and then the threads on the screw hook shank, clear of the loop', () => {
+    const hook = silhouetteOf('hook');
+
+    const shankRadius = shankRadiusOf(hook.points);
+    assert.ok(hook.points.some(({ y }) => y > shankRadius * 1.2), 'no collar before the threads');
+    const loopEnd = extentOf(hook.points.filter(({ y }) => y < -2 * shankRadius)).right;
+    const threads = hook.strokes.filter(isDiagonal);
     assert.ok(threads.length > 5, 'no diagonal threads');
+    assert.ok(extentOf(threads.flat()).left > loopEnd, 'the threads run under the loop');
   });
 
-  it('should draw a screw hook lying with a round loop on the left, centered on a pointed threaded shank, in one contour', () => {
-    const { outline, strokes } = drawHardwareIcon('hook');
+  it('should draw a wall plug with a collar on the left, small fins and a rounded end', () => {
+    const wallPlug = silhouetteOf('wallPlug');
 
-    const [contour, ...others] = contoursOf(outline);
-    assert.equal(others.length, 0);
-    assert.ok(contour.some(({ type }) => type === 'C'), 'the hook is not curved');
-    const points = onCurvePointsOf(contour);
-    const extent = extentOf(points);
-    const shankRadius = Math.min(...points.filter(({ y }) => y < 0 && !isAlmostEqual(y, 0) && y > extent.top / 2).map(({ y }) => -y));
-    assert.ok(extent.top < -3 * shankRadius, 'the hook does not rise above the shank');
-    const tip = cornersAt(points, extent.right);
-    assert.equal(tip.length, 1);
-    assert.ok(isAlmostEqual(tip[0].y, 0), 'the tip is not on the axis');
-    const hookEnd = Math.max(...points.filter(({ y }) => y < -2 * shankRadius).map(({ x }) => x));
-    const threads = strokesOf(strokes).filter(([start, end]) => !isAlmostEqual(start.x, end.x));
-    assert.ok(threads.length > 5, 'no diagonal threads');
-    assert.ok(Math.min(...threads.map(([start]) => start.x)) > hookEnd, 'the threads run under the hook');
-    assert.ok(Math.abs(extent.top + extent.bottom) < 1e-3, 'the shank is not centered between the top and the bottom of the loop');
-    assert.ok(!contour.some(({ type, y }) => type === 'L' && y < -2 * shankRadius), 'the hook has a straight part');
-    assert.ok(points.some(({ y }) => y > shankRadius * 1.2), 'no collar before the threads');
+    assert.ok(extentOf(tallestPointsOf(wallPlug)).right < fractionAlong(wallPlug.extent, 1 / 10), 'no collar on the left');
+    assert.ok(directionChangesAlongTopEdge(wallPlug.corners) > 6, 'no fins along the edges');
+    assert.ok(wallPlug.body.some(({ type, x1 }) => type === 'Q' && x1 > fractionAlong(wallPlug.extent, 9 / 10)), 'the end is not rounded');
   });
 
-  it('should draw a wall plug lying with a collar on the left, small fins, a rounded end and a ladder along its axis', () => {
-    const { outline, strokes } = drawHardwareIcon('wallPlug');
+  it('should draw a ladder along the axis of the wall plug', () => {
+    const wallPlug = silhouetteOf('wallPlug');
 
-    const [contour, ...others] = contoursOf(outline);
-    assert.equal(others.length, 0);
-    const points = onCurvePointsOf(contour);
-    const extent = extentOf(points);
-    assert.ok(extent.right - extent.left > 3 * (extent.bottom - extent.top), 'the wall plug is not lying');
-    const collarPoints = points.filter(({ y }) => isAlmostEqual(y, extent.top));
-    assert.ok(Math.max(...collarPoints.map(({ x }) => x)) < extent.left + (extent.right - extent.left) / 10, 'no collar on the left');
-    assert.ok(directionChangesAlong(cornersOf(contour), true) > 6, 'no fins along the edges');
-    assert.ok(contour.some(({ type, x1 }) => type === 'Q' && x1 > extent.right - 0.5), 'the end is not rounded');
-    const lines = strokesOf(strokes).filter((stroke) => stroke.length === 2);
-    const rails = lines.filter(([start, end]) => isAlmostEqual(start.y, end.y) && end.x - start.x > (extent.right - extent.left) / 2);
-    const rungs = lines.filter(([start, end]) => isAlmostEqual(start.x, end.x) && Math.abs(start.y) < 0.2 && Math.abs(end.y) < 0.2);
+    const nearAxis = heightOf(wallPlug.extent) / 4;
+    const rails = wallPlug.strokes.filter((stroke) => isHorizontal(stroke) && lengthOf(extentOf(stroke)) > lengthOf(wallPlug.extent) / 2);
+    const rungs = wallPlug.strokes.filter((stroke) => isVertical(stroke) && stroke.every(({ y }) => Math.abs(y) < nearAxis));
     assert.equal(rails.length, 2, 'no two rails along the axis');
     assert.ok(rungs.length > 4, 'no rungs between the rails');
   });
 
-  it('should draw a Molly anchor lying with a head, a spiked flange, a sleeve split into three strips and a threaded cone', () => {
-    const { outline, strokes } = drawHardwareIcon('mollyAnchor');
+  it('should draw two anti-rotation wings spreading towards the collar of the wall plug', () => {
+    const wallPlug = silhouetteOf('wallPlug');
 
-    const [body, ...slots] = contoursOf(outline);
-    const points = onCurvePointsOf(body);
-    const extent = extentOf(points);
-    const length = extent.right - extent.left;
-    assert.ok(length > 3 * (extent.bottom - extent.top), 'the Molly anchor is not lying');
-    const flangePoints = points.filter(({ y }) => isAlmostEqual(y, extent.top));
-    const flangeEnd = Math.max(...flangePoints.map(({ x }) => x));
-    assert.ok(flangeEnd < extent.left + length / 6, 'no flange on the left');
-    assert.ok(Math.min(...flangePoints.map(({ x }) => x)) > extent.left, 'no head before the flange');
-    const spikeTips = points.filter(({ x, y }) => x > flangeEnd && Math.abs(y) > (extent.bottom - extent.top) / 3 && x < extent.left + length / 4);
-    assert.ok(spikeTips.length >= 2, 'no spikes on the flange');
-    assert.equal(cornersAt(points, extent.right).length, 2, 'the end is not flat');
-    assert.equal(slots.length, 2, 'the sleeve is not split into three strips');
-    for (const slot of slots) {
-      assert.notEqual(windingOf(slot), windingOf(body), 'a slot would be filled');
-      const slotExtent = extentOf(onCurvePointsOf(slot));
-      assert.ok(slotExtent.right - slotExtent.left > 5 * (slotExtent.bottom - slotExtent.top), 'a slot is not long along the sleeve');
+    const wings = wallPlug.strokes.filter(isDiagonal);
+    assert.equal(wings.length, 2);
+    for (const [root, tip] of wings) {
+      assert.ok(tip.x < root.x && tip.x > collarEndOf(wallPlug), 'a wing does not point towards the collar');
+      assert.ok(Math.abs(tip.y) > Math.abs(root.y), 'a wing does not spread out');
     }
-    const coneThreads = strokesOf(strokes).filter(([start, end]) => isAlmostEqual(start.x, end.x) && start.x > extent.right - length / 8);
-    assert.ok(coneThreads.length >= 2, 'no threads on the cone');
   });
 
-  it('should draw a line across the head of the Molly anchor where it meets the flange', () => {
-    const { outline, strokes } = drawHardwareIcon('mollyAnchor');
+  it('should draw a line across the wall plug body where the collar ends', () => {
+    const wallPlug = silhouetteOf('wallPlug');
 
-    const points = onCurvePointsOf(contoursOf(outline)[0]);
-    const extent = extentOf(points);
-    const flangeStart = Math.min(...points.filter(({ y }) => isAlmostEqual(y, extent.top)).map(({ x }) => x));
-    const headRadius = Math.max(...points.filter(({ x, y }) => y < 0 && x < flangeStart).map(({ y }) => -y));
-    const lineAtFlange = strokesOf(strokes).find(([start, end]) => isAlmostEqual(start.x, flangeStart) && isAlmostEqual(end.x, flangeStart));
-    assert.ok(lineAtFlange, 'no line between the head and the flange');
-    assert.ok(isAlmostEqual(Math.abs(lineAtFlange[1].y - lineAtFlange[0].y), 2 * headRadius), 'the line does not span exactly the head');
+    assert.ok(verticalLineAt(wallPlug.strokes, collarEndOf(wallPlug)), 'no line where the collar ends');
+  });
+
+  it('should draw a Molly anchor with a head, then a flange as tall as the drawing with two spikes, and a flat end', () => {
+    const molly = silhouetteOf('mollyAnchor');
+
+    const flange = flangeOf(molly);
+    assert.ok(flange.end < fractionAlong(molly.extent, 1 / 6), 'no flange on the left');
+    assert.ok(flange.start > molly.extent.left, 'no head before the flange');
+    const isNearTheFlange = (x) => x > flange.end && x < fractionAlong(molly.extent, 1 / 4);
+    const spikeTips = molly.points.filter(({ x, y }) => isNearTheFlange(x) && Math.abs(y) > heightOf(molly.extent) / 3);
+    assert.ok(spikeTips.length >= 2, 'no spikes on the flange');
+    assert.ok(hasFlatEnd(molly), 'the end is not flat');
+  });
+
+  it('should split the Molly anchor sleeve into three strips with two hollow slots', () => {
+    const molly = silhouetteOf('mollyAnchor');
+
+    assert.equal(molly.holes.length, 2);
+    for (const slot of molly.holes) {
+      assert.notEqual(windingOf(slot), windingOf(molly.body), 'a slot would be filled');
+      const slotExtent = extentOf(onCurvePointsOf(slot));
+      assert.ok(lengthOf(slotExtent) > 5 * heightOf(slotExtent), 'a slot is not long along the sleeve');
+    }
+  });
+
+  it('should draw threads on the cone ending the Molly anchor', () => {
+    assert.ok(coneThreadsOf(silhouetteOf('mollyAnchor')).length >= 2, 'no threads on the cone');
+  });
+
+  it('should draw the threads of the Molly anchor cone from edge to edge', () => {
+    const molly = silhouetteOf('mollyAnchor');
+
+    const [coneEnd, coneStart] = molly.corners.filter(isAboveAxis).sort((first, second) => second.x - first.x);
+    const coneThreads = molly.strokes.filter((stroke) => isVertical(stroke) && stroke[0].x > coneStart.x && stroke[0].x < coneEnd.x);
+    assert.ok(coneThreads.length >= 2, 'no threads on the cone');
+    for (const thread of coneThreads) {
+      const edgeDistanceAtThread = distanceFromAxisAlong([coneStart, coneEnd], thread[0].x);
+      assert.ok(isAlmostEqual(verticalSpanOf(thread), 2 * edgeDistanceAtThread), 'a cone thread does not reach the outline');
+    }
+  });
+
+  it('should draw lines across the Molly anchor where the head meets the flange and where the flange meets the sleeve', () => {
+    const molly = silhouetteOf('mollyAnchor');
+
+    const flange = flangeOf(molly);
+    const headRadius = Math.max(...molly.points.filter((point) => isAboveAxis(point) && point.x < flange.start).map(distanceFromAxisOf));
+    const lineAtFlangeStart = verticalLineAt(molly.strokes, flange.start);
+    assert.ok(lineAtFlangeStart, 'no line between the head and the flange');
+    assert.ok(isAlmostEqual(verticalSpanOf(lineAtFlangeStart), 2 * headRadius), 'the line does not span exactly the head');
+    assert.ok(verticalLineAt(molly.strokes, flange.end), 'no line between the flange and the sleeve');
   });
 
   it('should draw a nut seen from the front as a hexagon with a hollow round hole, without strokes', () => {
@@ -287,20 +434,88 @@ describe('drawHardwareIcon', () => {
   });
 });
 
+function firstFinStepOf(wallPlug) {
+  return stepsAlongTopEdge(wallPlug.points).find(({ x }) => x > collarEndOf(wallPlug));
+}
+
+function finRiseOf(wallPlug) {
+  return firstFinStepOf(wallPlug).stepHeight;
+}
+
+function shortestFlatBetweenFinsOf(wallPlug) {
+  const finCorners = wallPlug.corners.filter((corner) => isAboveAxis(corner) && corner.x >= firstFinStepOf(wallPlug).x);
+  return smallestGapBetween(sortedDistinctValues(finCorners.map(({ x }) => x)));
+}
+
+function gapBetweenRailsOf(wallPlug) {
+  const [firstRail, secondRail] = wallPlug.strokes.filter(isHorizontal);
+  return Math.abs(firstRail[0].y - secondRail[0].y);
+}
+
+function flangeThicknessOf(molly) {
+  const flange = flangeOf(molly);
+  return flange.end - flange.start;
+}
+
+function slotWidthOf(molly) {
+  return heightOf(extentOf(onCurvePointsOf(molly.holes[0])));
+}
+
+function coneThreadPitchOf(molly) {
+  const [firstConeThread, secondConeThread] = coneThreadsOf(molly);
+  return secondConeThread[0].x - firstConeThread[0].x;
+}
+
+function narrowestGapAroundSpikesOf(molly) {
+  const cornersAtFlangeEnd = pointsAt(molly.corners, flangeOf(molly).end).filter(isAboveAxis);
+  return smallestGapBetween(sortedDistinctValues(cornersAtFlangeEnd.map(distanceFromAxisOf)));
+}
+
 describe('thinnestHardwareDetail', () => {
   it('should give the thickness of the head of a nail', () => {
-    const points = onCurvePointsOf(contoursOf(drawHardwareIcon('nail').outline)[0]);
-    const extent = extentOf(points);
+    const nail = silhouetteOf('nail');
 
-    assert.ok(isAlmostEqual(thinnestHardwareDetail('nail'), shankStartOf(points) - extent.left));
+    assert.ok(isAlmostEqual(thinnestHardwareDetail('nail'), shankStartOf(nail.points) - nail.extent.left));
   });
 
   it('should give the width of the chamfer of the head of a bolt', () => {
-    const corners = cornersOf(contoursOf(drawHardwareIcon('bolt').outline)[0]);
-    const extent = extentOf(corners);
-    const chamferEnd = Math.min(...corners.filter(({ y }) => isAlmostEqual(y, extent.top)).map(({ x }) => x));
+    const bolt = silhouetteOf('bolt');
 
-    assert.ok(isAlmostEqual(thinnestHardwareDetail('bolt'), chamferEnd - extent.left));
+    const chamferEnd = extentOf(tallestPointsOf(bolt)).left;
+    assert.ok(isAlmostEqual(thinnestHardwareDetail('bolt'), chamferEnd - bolt.extent.left));
+  });
+
+  it('should give the gap between the threads, or the shank width if thinner, of a screw', () => {
+    assert.ok(isAlmostEqual(thinnestHardwareDetail('screw'), thinnestDetailOfThreadedShank(silhouetteOf('screw'))));
+  });
+
+  it('should give the thinnest of the collar step and the threaded shank details of a screw hook', () => {
+    const hook = silhouetteOf('hook');
+
+    const collarSteps = stepsAlongTopEdge(hook.points).filter(({ narrowerRadius }) => isAlmostEqual(narrowerRadius, shankRadiusOf(hook.points)));
+    const collarStep = Math.min(...collarSteps.map(({ stepHeight }) => stepHeight));
+    assert.ok(isAlmostEqual(thinnestHardwareDetail('hook'), Math.min(collarStep, thinnestDetailOfThreadedShank(hook))));
+  });
+
+  it('should give the thinnest of the eye ring and the threaded shank details of an eye screw', () => {
+    const eyeScrew = silhouetteOf('eyeScrew');
+
+    const eyeRing = extentOf(onCurvePointsOf(eyeScrew.holes[0])).left - eyeScrew.extent.left;
+    assert.ok(isAlmostEqual(thinnestHardwareDetail('eyeScrew'), Math.min(eyeRing, thinnestDetailOfThreadedShank(eyeScrew))));
+  });
+
+  it('should give the thinnest of the fin rise, the flat between fins and the gap between rails of a wall plug', () => {
+    const wallPlug = silhouetteOf('wallPlug');
+
+    const expected = Math.min(finRiseOf(wallPlug), shortestFlatBetweenFinsOf(wallPlug), gapBetweenRailsOf(wallPlug));
+    assert.ok(isAlmostEqual(thinnestHardwareDetail('wallPlug'), expected));
+  });
+
+  it('should give the thinnest of the flange, the slots, the cone thread pitch and the gaps around the spikes of a Molly anchor', () => {
+    const molly = silhouetteOf('mollyAnchor');
+
+    const expected = Math.min(flangeThicknessOf(molly), slotWidthOf(molly), coneThreadPitchOf(molly), narrowestGapAroundSpikesOf(molly));
+    assert.ok(isAlmostEqual(thinnestHardwareDetail('mollyAnchor'), expected));
   });
 });
 
@@ -310,7 +525,7 @@ describe('aspectRatioOfHardwareIcon', () => {
       const { outline, strokes } = drawHardwareIcon(key);
       const extent = extentOf([...outline, ...strokes]);
 
-      assert.ok(isAlmostEqual(aspectRatioOfHardwareIcon(key), (extent.right - extent.left) / (extent.bottom - extent.top)), key);
+      assert.ok(isAlmostEqual(aspectRatioOfHardwareIcon(key), lengthOf(extent) / heightOf(extent)), key);
     }
   });
 });

@@ -38,3 +38,11 @@ export function windingOf(contour) {
   }, 0);
   return signedArea > 0 ? 'clockwise' : 'counterclockwise';
 }
+
+export function pointOnCubicCurve(start, { x1, y1, x2, y2, x, y }, progress) {
+  const remaining = 1 - progress;
+  return {
+    x: remaining ** 3 * start.x + 3 * remaining ** 2 * progress * x1 + 3 * remaining * progress ** 2 * x2 + progress ** 3 * x,
+    y: remaining ** 3 * start.y + 3 * remaining ** 2 * progress * y1 + 3 * remaining * progress ** 2 * y2 + progress ** 3 * y,
+  };
+}

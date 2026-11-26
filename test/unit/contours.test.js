@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { arc, circle, hollow, placeTogetherInBox, polyline, rectangle, solid, starOfArms } from '../../src/icons/contours.js';
-import { extentOf, isAlmostEqual, windingOf } from './helpers/geometry.js';
+import { arc, circle, hollow, placeTogetherInBox, polygonWithRoundedCorners, polyline, rectangle, solid, starOfArms } from '../../src/icons/contours.js';
+import { extentOf, isAlmostEqual, pointOnCubicCurve, windingOf } from './helpers/geometry.js';
 
 describe('hollow', () => {
   it('should wind a contour counterclockwise on screen whatever the way it was drawn', () => {
@@ -70,27 +70,106 @@ describe('placeTogetherInBox', () => {
   });
 });
 
-function pointOnCubicCurve(start, { x1, y1, x2, y2, x, y }, progress) {
-  const remaining = 1 - progress;
-  return {
-    x: remaining ** 3 * start.x + 3 * remaining ** 2 * progress * x1 + 3 * remaining * progress ** 2 * x2 + progress ** 3 * x,
-    y: remaining ** 3 * start.y + 3 * remaining ** 2 * progress * y1 + 3 * remaining * progress ** 2 * y2 + progress ** 3 * y,
-  };
+const CIRCLE_TOLERANCE = 0.01;
+const SAMPLE_PROGRESSES = [0.25, 0.5, 0.75, 1];
+
+function samplesAlong(start, segments) {
+  const samples = [];
+  let segmentStart = start;
+  for (const segment of segments) {
+    for (const progress of SAMPLE_PROGRESSES) {
+      samples.push(pointOnCubicCurve(segmentStart, segment, progress));
+    }
+    segmentStart = { x: segment.x, y: segment.y };
+  }
+  return samples;
+}
+
+function angleOnScreen(center, point) {
+  return Math.atan2(center.y - point.y, point.x - center.x);
 }
 
 describe('arc', () => {
-  it('should follow the circle from one angle to the other, on screen counterclockwise', () => {
-    const center = { x: 1, y: 2 };
-    const segments = arc({ center, radius: 3, fromAngle: 0, toAngle: Math.PI * 1.5 });
+  const circleOnScreen = { center: { x: 1, y: 2 }, radius: 3 };
 
-    let start = { x: 4, y: 2 };
-    for (const segment of segments) {
-      for (const progress of [0.25, 0.5, 0.75, 1]) {
-        const point = pointOnCubicCurve(start, segment, progress);
-        assert.ok(Math.abs(Math.hypot(point.x - center.x, point.y - center.y) - 3) < 0.01, 'the arc leaves the circle');
-      }
-      start = segment;
+  function pointAt(angle) {
+    return {
+      x: circleOnScreen.center.x + circleOnScreen.radius * Math.cos(angle),
+      y: circleOnScreen.center.y - circleOnScreen.radius * Math.sin(angle),
+    };
+  }
+
+  function assertFollowsTheCircle(samples) {
+    for (const sample of samples) {
+      const distance = Math.hypot(sample.x - circleOnScreen.center.x, sample.y - circleOnScreen.center.y);
+      assert.ok(Math.abs(distance - circleOnScreen.radius) < CIRCLE_TOLERANCE, 'the arc leaves the circle');
     }
-    assert.ok(isAlmostEqual(start.x, 1) && isAlmostEqual(start.y, 5), 'the arc does not end at the last angle');
+  }
+
+  function assertEndsAt(samples, angle) {
+    const end = samples.at(-1);
+    const expectedEnd = pointAt(angle);
+    assert.ok(isAlmostEqual(end.x, expectedEnd.x) && isAlmostEqual(end.y, expectedEnd.y), 'the arc does not end at the last angle');
+  }
+
+  it('should follow the circle counterclockwise on screen when the end angle is larger', () => {
+    const samples = samplesAlong(pointAt(0), arc({ ...circleOnScreen, fromAngle: 0, toAngle: (3 * Math.PI) / 2 }));
+
+    assertFollowsTheCircle(samples);
+    const firstSampleAngle = angleOnScreen(circleOnScreen.center, samples[0]);
+    assert.ok(firstSampleAngle > 0 && firstSampleAngle < Math.PI / 2, 'the arc does not start counterclockwise');
+    assertEndsAt(samples, (3 * Math.PI) / 2);
+  });
+
+  it('should follow the circle clockwise on screen when the end angle is smaller', () => {
+    const samples = samplesAlong(pointAt(Math.PI / 2), arc({ ...circleOnScreen, fromAngle: Math.PI / 2, toAngle: -Math.PI }));
+
+    assertFollowsTheCircle(samples);
+    const firstSampleAngle = angleOnScreen(circleOnScreen.center, samples[0]);
+    assert.ok(firstSampleAngle > 0 && firstSampleAngle < Math.PI / 2, 'the arc does not start clockwise');
+    assertEndsAt(samples, -Math.PI);
+  });
+
+  it('should draw nothing when the arc starts and ends at the same angle', () => {
+    assert.deepEqual(arc({ ...circleOnScreen, fromAngle: 1, toAngle: 1 }), []);
+  });
+
+  it('should refuse an angle that is not a finite number', () => {
+    assert.throws(() => arc({ ...circleOnScreen, fromAngle: 0, toAngle: Number.NaN }), /Arc angles must be finite numbers/);
+    assert.throws(() => arc({ ...circleOnScreen, fromAngle: 0, toAngle: Infinity }), /Arc angles must be finite numbers/);
+    assert.throws(() => arc({ ...circleOnScreen, fromAngle: Number.NaN, toAngle: 0 }), /Arc angles must be finite numbers/);
+  });
+
+  it('should refuse a radius that is not a finite number', () => {
+    assert.throws(() => arc({ ...circleOnScreen, radius: Number.NaN, fromAngle: 0, toAngle: 1 }), /Arc radius must be a finite number/);
+  });
+
+  it('should refuse a center that is not made of finite numbers', () => {
+    assert.throws(() => arc({ ...circleOnScreen, center: { x: 0, y: Number.NaN }, fromAngle: 0, toAngle: 1 }), /Arc center must be made of finite numbers/);
+  });
+});
+
+describe('polygonWithRoundedCorners', () => {
+  it('should refuse roundings longer together than the side they share', () => {
+    const corners = [
+      { x: 0, y: 0, rounding: 0.6 },
+      { x: 1, y: 0, rounding: 0.6 },
+      { x: 1, y: 2 },
+      { x: 0, y: 2 },
+    ];
+
+    assert.throws(() => polygonWithRoundedCorners(corners), /Roundings longer than their side/);
+  });
+
+  it('should refuse a rounding that is not a finite number', () => {
+    const corners = [{ x: 0, y: 0, rounding: Number.NaN }, { x: 1, y: 0 }, { x: 1, y: 2 }];
+
+    assert.throws(() => polygonWithRoundedCorners(corners), /Roundings must be finite positive numbers/);
+  });
+
+  it('should refuse a negative rounding', () => {
+    const corners = [{ x: 0, y: 0, rounding: -0.1 }, { x: 1, y: 0 }, { x: 1, y: 2 }];
+
+    assert.throws(() => polygonWithRoundedCorners(corners), /Roundings must be finite positive numbers/);
   });
 });

@@ -30,5 +30,4 @@ describe('chooseLayout', () => {
   it('should put long dimensions above the screw, even on a wide label', () => {
     assert.equal(chooseLayout({ ...screwSpec, drive: null, dimensions: 'M5 x 52 tête fraisée inox A2' }, font).orientation, 'stacked');
   });
-
 });
