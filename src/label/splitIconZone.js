@@ -6,6 +6,10 @@ function usageSideFor(iconZone, usageCount) {
   return Math.min(iconZone.height * USAGE_ROW_HEIGHT_SHARE, iconZone.width / widthInUsageSides);
 }
 
+function usageRowHeightFor(side) {
+  return side * (1 + GAP_TO_USAGE_SIDE_RATIO);
+}
+
 function usageBoxesAlongTheBottom(iconZone, usageCount, side) {
   const gap = side * GAP_TO_USAGE_SIDE_RATIO;
   const rowWidth = usageCount * side + (usageCount - 1) * gap;
@@ -23,9 +27,8 @@ export function splitIconZone(iconZone, usageCount) {
     return { drawingZone: iconZone, usageBoxes: [] };
   }
   const side = usageSideFor(iconZone, usageCount);
-  const drawingHeight = iconZone.height - side * (1 + GAP_TO_USAGE_SIDE_RATIO);
   return {
-    drawingZone: { ...iconZone, height: drawingHeight },
+    drawingZone: { ...iconZone, height: iconZone.height - usageRowHeightFor(side) },
     usageBoxes: usageBoxesAlongTheBottom(iconZone, usageCount, side),
   };
 }

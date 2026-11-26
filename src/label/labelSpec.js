@@ -107,11 +107,19 @@ function readDimensions(fields, font) {
   return dimensions;
 }
 
+function hasUnknownUsage(usages) {
+  return !Array.isArray(usages) || !usages.every((usage) => findUsageType(usage));
+}
+
+function hasDuplicatedUsage(usages) {
+  return new Set(usages).size !== usages.length;
+}
+
 function readUsages(fields) {
-  if (!fields.usages.every((usage) => findUsageType(usage))) {
+  if (hasUnknownUsage(fields.usages)) {
     throw new LabelSpecError('usages', 'unknown');
   }
-  if (new Set(fields.usages).size !== fields.usages.length) {
+  if (hasDuplicatedUsage(fields.usages)) {
     throw new LabelSpecError('usages', 'duplicated');
   }
   return fields.usages;

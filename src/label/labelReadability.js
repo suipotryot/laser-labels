@@ -30,16 +30,16 @@ function hasHardwareIconTooDetailedToEngrave(spec, font) {
   return thinnestHardwareDetail(spec.hardwareType) * placeHardwareIcon(spec, font).scale < MINIMUM_ENGRAVABLE_DETAIL_MILLIMETERS;
 }
 
-function hasUsageIconTooDetailedToEngrave({ usage, scale }) {
+function isUsageIconTooDetailedToEngrave({ usage, scale }) {
   return thinnestUsageIconDetail(usage) * scale < MINIMUM_ENGRAVABLE_DETAIL_MILLIMETERS;
 }
 
-function hasUsageIconsTooDetailedToEngrave(spec, font) {
-  return placeUsageIcons(spec, font).some(hasUsageIconTooDetailedToEngrave);
+function hasAnyUsageIconTooDetailedToEngrave(spec, font) {
+  return placeUsageIcons(spec, font).some(isUsageIconTooDetailedToEngrave);
 }
 
 export function hasDetailsTooSmallToEngrave(spec, font) {
   return hasHardwareIconTooDetailedToEngrave(spec, font)
-    || hasUsageIconsTooDetailedToEngrave(spec, font)
+    || hasAnyUsageIconTooDetailedToEngrave(spec, font)
     || placeLabelTextLines(spec, font).some((placedLine) => hasLineDetailsTooSmallToEngrave(font, placedLine));
 }

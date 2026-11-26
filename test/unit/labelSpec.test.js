@@ -31,6 +31,15 @@ describe('readLabelSpec', () => {
     );
   });
 
+  it('should reject usages that are not a list', () => {
+    for (const usages of [undefined, null, 'metal', {}]) {
+      assert.throws(
+        () => readLabelSpec({ ...validFields, usages }, font),
+        { name: 'LabelSpecError', field: 'usages', reason: 'unknown' },
+      );
+    }
+  });
+
   it('should reject the same usage ticked twice', () => {
     assert.throws(
       () => readLabelSpec({ ...validFields, usages: ['metal', 'metal'] }, font),
