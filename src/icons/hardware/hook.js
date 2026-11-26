@@ -81,4 +81,7 @@ function drawHook() {
   return { outline: solid(hookBody()), strokes: diagonalThreadStrokes(HOOK) };
 }
 
-export const hook = { draw: drawHook, thinnestDetail: thinnestDetailOfThreadedShank(HOOK) };
+export const hook = {
+  draw: drawHook,
+  thinnestDetail: Math.min(thinnestDetailOfThreadedShank(HOOK), HOOK.collarRadius - HOOK.shankRadius),
+};

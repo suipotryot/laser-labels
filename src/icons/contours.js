@@ -26,7 +26,22 @@ function cornerSegments(corner, previous, next) {
   return [{ type: 'L', ...entry }, { type: 'Q', x1: corner.x, y1: corner.y, x: exit.x, y: exit.y }];
 }
 
+function roundingOf(corner) {
+  return corner.rounding ?? 0;
+}
+
+function doRoundingsOverflowASide(corners) {
+  return corners.some((corner, index) => {
+    const next = corners[(index + 1) % corners.length];
+    const sideLength = Math.hypot(next.x - corner.x, next.y - corner.y);
+    return roundingOf(corner) + roundingOf(next) > sideLength + FLOATING_POINT_TOLERANCE;
+  });
+}
+
 export function polygonWithRoundedCorners(corners) {
+  if (doRoundingsOverflowASide(corners)) {
+    throw new Error('Roundings longer than their side would make the outline cross itself');
+  }
   const [first, ...others] = corners.flatMap((corner, index) => cornerSegments(corner, corners.at(index - 1), corners[(index + 1) % corners.length]));
   return [{ type: 'M', x: first.x, y: first.y }, ...others, { type: 'Z' }];
 }
@@ -184,6 +199,12 @@ function quarterTurnAnglesStrictlyBetween(fromAngle, toAngle) {
 }
 
 export function arc({ center, radius, fromAngle, toAngle }) {
+  if (!Number.isFinite(fromAngle) || !Number.isFinite(toAngle)) {
+    throw new Error('Arc angles must be finite numbers');
+  }
+  if (fromAngle === toAngle) {
+    return [];
+  }
   const angles = [fromAngle, ...quarterTurnAnglesStrictlyBetween(fromAngle, toAngle), toAngle];
   return angles.slice(1).map((angle, index) => arcPieceUpToAQuarter({ center, radius }, angles[index], angle));
 }

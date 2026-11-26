@@ -86,4 +86,7 @@ function drawWallPlug() {
   };
 }
 
-export const wallPlug = { draw: drawWallPlug, thinnestDetail: Math.min(WALL_PLUG.finRise, 2 * WALL_PLUG.railRadius) };
+export const wallPlug = {
+  draw: drawWallPlug,
+  thinnestDetail: Math.min(WALL_PLUG.finRise, WALL_PLUG.finPitch - WALL_PLUG.finLength, 2 * WALL_PLUG.railRadius),
+};

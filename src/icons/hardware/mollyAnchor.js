@@ -1,5 +1,5 @@
 import { hollow, polygonWithRoundedCorners } from '../contours.js';
-import { BOTTOM, TOP, atSide, mirroredOutline, verticalStroke, verticalStrokesAlong } from './lyingPiece.js';
+import { BOTTOM, TOP, atSide, evenlySpacedPositions, mirroredOutline, verticalStroke } from './lyingPiece.js';
 
 const MOLLY_ANCHOR = {
   headRadius: 0.36,
@@ -56,13 +56,17 @@ function expansionSlot(side) {
   ]));
 }
 
+function coneRadiusAt(x) {
+  const progressAlongCone = (x - MOLLY_ANCHOR.coneStart) / (MOLLY_ANCHOR.end - MOLLY_ANCHOR.coneStart);
+  return MOLLY_ANCHOR.sleeveRadius + (MOLLY_ANCHOR.endRadius - MOLLY_ANCHOR.sleeveRadius) * progressAlongCone;
+}
+
 function coneThreadStrokes() {
-  return verticalStrokesAlong({
+  return evenlySpacedPositions({
     from: MOLLY_ANCHOR.coneStart + MOLLY_ANCHOR.coneThreadPitch,
     to: MOLLY_ANCHOR.end - MOLLY_ANCHOR.coneThreadPitch,
     pitch: MOLLY_ANCHOR.coneThreadPitch,
-    halfLength: MOLLY_ANCHOR.endRadius,
-  });
+  }).flatMap((x) => verticalStroke(x, coneRadiusAt(x)));
 }
 
 function drawMollyAnchor() {
@@ -79,5 +83,11 @@ function drawMollyAnchor() {
 
 export const mollyAnchor = {
   draw: drawMollyAnchor,
-  thinnestDetail: Math.min(FLANGE_THICKNESS, 2 * MOLLY_ANCHOR.slotHalfWidth, MOLLY_ANCHOR.coneThreadPitch),
+  thinnestDetail: Math.min(
+    FLANGE_THICKNESS,
+    2 * MOLLY_ANCHOR.slotHalfWidth,
+    MOLLY_ANCHOR.coneThreadPitch,
+    MOLLY_ANCHOR.flangeRadius - MOLLY_ANCHOR.spikeRadius - MOLLY_ANCHOR.spikeHalfWidth,
+    MOLLY_ANCHOR.spikeRadius - MOLLY_ANCHOR.spikeHalfWidth - MOLLY_ANCHOR.sleeveRadius,
+  ),
 };

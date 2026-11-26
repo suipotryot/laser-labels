@@ -50,11 +50,15 @@ function shankStartOf(points) {
   return Math.min(...points.filter(({ y }) => isAlmostEqual(y, -shankRadius)).map(({ x }) => x));
 }
 
+function distinctValues(values) {
+  return values.filter((value, index) => !values.slice(0, index).some((earlier) => isAlmostEqual(earlier, value)));
+}
+
 function stepsAlongTopEdge(points) {
   const topEdge = points.filter(({ y }) => y < 0 && !isAlmostEqual(y, 0));
   const xs = [...new Set(topEdge.map(({ x }) => x))].sort((first, second) => first - second);
   return xs
-    .map((x) => ({ x, radii: pointsAt(topEdge, x).map(({ y }) => -y) }))
+    .map((x) => ({ x, radii: distinctValues(pointsAt(topEdge, x).map(({ y }) => -y)) }))
     .filter(({ radii }) => radii.length >= 2)
     .map(({ x, radii }) => ({ x, radiusBefore: Math.max(...radii), radiusAfter: Math.min(...radii) }));
 }
@@ -354,6 +358,19 @@ describe('drawHardwareIcon', () => {
     assert.ok(molly.strokes.filter((stroke) => isVertical(stroke) && stroke[0].x > lastEighth).length >= 2, 'no threads on the cone');
   });
 
+  it('should draw the threads of the Molly anchor cone from edge to edge', () => {
+    const molly = silhouetteOf('mollyAnchor');
+
+    const coneTop = molly.corners.filter(({ y }) => y < 0).sort((first, second) => second.x - first.x).slice(0, 2);
+    const [coneEnd, coneStart] = coneTop;
+    const coneRadiusAt = (x) => -(coneStart.y + ((coneEnd.y - coneStart.y) * (x - coneStart.x)) / (coneEnd.x - coneStart.x));
+    const coneThreads = molly.strokes.filter((stroke) => isVertical(stroke) && stroke[0].x > coneStart.x && stroke[0].x < coneEnd.x);
+    assert.ok(coneThreads.length >= 2, 'no threads on the cone');
+    for (const thread of coneThreads) {
+      assert.ok(isAlmostEqual(verticalSpanOf(thread), 2 * coneRadiusAt(thread[0].x)), 'a cone thread does not reach the outline');
+    }
+  });
+
   it('should draw lines across the Molly anchor where the head meets the flange and where the flange meets the sleeve', () => {
     const molly = silhouetteOf('mollyAnchor');
 
@@ -393,10 +410,15 @@ describe('thinnestHardwareDetail', () => {
     assert.ok(isAlmostEqual(thinnestHardwareDetail('bolt'), chamferEnd - bolt.extent.left));
   });
 
-  it('should give the gap between the threads, or the shank width if thinner, of the screw hook and the screw', () => {
-    for (const key of ['hook', 'screw']) {
-      assert.ok(isAlmostEqual(thinnestHardwareDetail(key), thinnestThreadedShankDetailOf(silhouetteOf(key))), key);
-    }
+  it('should give the gap between the threads, or the shank width if thinner, of a screw', () => {
+    assert.ok(isAlmostEqual(thinnestHardwareDetail('screw'), thinnestThreadedShankDetailOf(silhouetteOf('screw'))));
+  });
+
+  it('should give the thinnest of the collar step and the threaded shank details of a screw hook', () => {
+    const hook = silhouetteOf('hook');
+
+    const collarStep = Math.min(...stepsAlongTopEdge(hook.points).map(({ radiusBefore, radiusAfter }) => radiusBefore - radiusAfter));
+    assert.ok(isAlmostEqual(thinnestHardwareDetail('hook'), Math.min(collarStep, thinnestThreadedShankDetailOf(hook))));
   });
 
   it('should give the thinnest of the eye ring and the threaded shank details of an eye screw', () => {
@@ -406,14 +428,16 @@ describe('thinnestHardwareDetail', () => {
     assert.ok(isAlmostEqual(thinnestHardwareDetail('eyeScrew'), Math.min(eyeRing, thinnestThreadedShankDetailOf(eyeScrew))));
   });
 
-  it('should give the rise of the fins of a wall plug, thinner than the gap between its rails', () => {
+  it('should give the thinnest of the fin rise, the flat between fins and the gap between rails of a wall plug', () => {
     const wallPlug = silhouetteOf('wallPlug');
 
     const [, firstFin] = stepsAlongTopEdge(wallPlug.points);
     const finRise = firstFin.radiusBefore - firstFin.radiusAfter;
+    const finCornerXs = [...new Set(wallPlug.corners.filter(({ x, y }) => y < 0 && x >= firstFin.x).map(({ x }) => x))].sort((first, second) => first - second);
+    const shortestSpanBetweenFinCorners = Math.min(...finCornerXs.slice(1).map((x, index) => x - finCornerXs[index]));
     const rails = wallPlug.strokes.filter(isHorizontal);
     const gapBetweenRails = Math.abs(rails[0][0].y - rails[1][0].y);
-    assert.ok(isAlmostEqual(thinnestHardwareDetail('wallPlug'), Math.min(finRise, gapBetweenRails)));
+    assert.ok(isAlmostEqual(thinnestHardwareDetail('wallPlug'), Math.min(finRise, shortestSpanBetweenFinCorners, gapBetweenRails)));
   });
 
   it('should give the thinnest of the flange, the slots and the cone thread pitch of a Molly anchor', () => {
@@ -425,7 +449,10 @@ describe('thinnestHardwareDetail', () => {
     const lastEighth = molly.extent.right - lengthOf(molly.extent) / 8;
     const [firstConeThread, secondConeThread] = molly.strokes.filter((stroke) => isVertical(stroke) && stroke[0].x > lastEighth);
     const coneThreadPitch = secondConeThread[0].x - firstConeThread[0].x;
-    assert.ok(isAlmostEqual(thinnestHardwareDetail('mollyAnchor'), Math.min(flangeThickness, slotWidth, coneThreadPitch)));
+    const flangeEnd = Math.max(...flangePoints.map(({ x }) => x));
+    const radiiAtFlangeEnd = pointsAt(molly.corners, flangeEnd).filter(({ y }) => y < 0).map(({ y }) => -y).sort((first, second) => first - second);
+    const narrowestGapAroundSpike = Math.min(...radiiAtFlangeEnd.slice(1).map((radius, index) => radius - radiiAtFlangeEnd[index]));
+    assert.ok(isAlmostEqual(thinnestHardwareDetail('mollyAnchor'), Math.min(flangeThickness, slotWidth, coneThreadPitch, narrowestGapAroundSpike)));
   });
 });
 

@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { arc, circle, hollow, placeTogetherInBox, polyline, rectangle, solid, starOfArms } from '../../src/icons/contours.js';
+import { arc, circle, hollow, placeTogetherInBox, polygonWithRoundedCorners, polyline, rectangle, solid, starOfArms } from '../../src/icons/contours.js';
 import { extentOf, isAlmostEqual, pointOnCubicCurve, windingOf } from './helpers/geometry.js';
 
 describe('hollow', () => {
@@ -123,5 +123,27 @@ describe('arc', () => {
     assert.ok(firstSampleAngle > 0 && firstSampleAngle < Math.PI / 2, 'the arc does not start clockwise');
     const end = samples.at(-1);
     assert.ok(isAlmostEqual(end.x, pointAt(-Math.PI).x) && isAlmostEqual(end.y, pointAt(-Math.PI).y), 'the arc does not end at the last angle');
+  });
+
+  it('should draw nothing when the arc starts and ends at the same angle', () => {
+    assert.deepEqual(arc({ ...circleOnScreen, fromAngle: 1, toAngle: 1 }), []);
+  });
+
+  it('should refuse an angle that is not a finite number', () => {
+    assert.throws(() => arc({ ...circleOnScreen, fromAngle: 0, toAngle: Number.NaN }), /Arc angles must be finite numbers/);
+    assert.throws(() => arc({ ...circleOnScreen, fromAngle: 0, toAngle: Infinity }), /Arc angles must be finite numbers/);
+  });
+});
+
+describe('polygonWithRoundedCorners', () => {
+  it('should refuse roundings longer together than the side they share', () => {
+    const corners = [
+      { x: 0, y: 0, rounding: 0.6 },
+      { x: 1, y: 0, rounding: 0.6 },
+      { x: 1, y: 2 },
+      { x: 0, y: 2 },
+    ];
+
+    assert.throws(() => polygonWithRoundedCorners(corners), /Roundings longer than their side/);
   });
 });
