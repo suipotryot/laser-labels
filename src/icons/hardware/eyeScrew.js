@@ -1,4 +1,4 @@
-import { FULL_TURN, arc, circleAround, hollow, polyline, solid } from '../contours.js';
+import { FULL_TURN, arc, circleAround, closed, hollow, polyline, solid } from '../contours.js';
 import { atSide, diagonalThreadStrokes, mirroredCorners, onAxis, thinnestDetailOfThreadedShank } from './lyingPiece.js';
 
 const EYE_SCREW = {
@@ -13,29 +13,34 @@ const EYE_SCREW = {
   end: 3.7,
 };
 
-const JUNCTION_ANGLE = Math.asin(EYE_SCREW.shankRadius / EYE_SCREW.eyeRadius);
-const JUNCTION_X = EYE_SCREW.eyeCenter.x + EYE_SCREW.eyeRadius * Math.cos(JUNCTION_ANGLE);
+const EYE_TO_SHANK_ANGLE = Math.asin(EYE_SCREW.shankRadius / EYE_SCREW.eyeRadius);
+const SHANK_START = EYE_SCREW.eyeCenter.x + EYE_SCREW.eyeRadius * Math.cos(EYE_TO_SHANK_ANGLE);
+const EYE_RING_WIDTH = EYE_SCREW.eyeRadius - EYE_SCREW.eyeHoleRadius;
 
 function eyeScrewEdge(side) {
-  return [atSide(JUNCTION_X, EYE_SCREW.shankRadius, side), atSide(EYE_SCREW.shankEnd, EYE_SCREW.shankRadius, side)];
+  return [atSide(SHANK_START, EYE_SCREW.shankRadius, side), atSide(EYE_SCREW.shankEnd, EYE_SCREW.shankRadius, side)];
+}
+
+function outerSideOfEye() {
+  return arc({ center: EYE_SCREW.eyeCenter, radius: EYE_SCREW.eyeRadius, fromAngle: FULL_TURN - EYE_TO_SHANK_ANGLE, toAngle: EYE_TO_SHANK_ANGLE });
 }
 
 function eyeScrewBody() {
-  return [
-    ...polyline(mirroredCorners(eyeScrewEdge, onAxis(EYE_SCREW.end))),
-    ...arc({ center: EYE_SCREW.eyeCenter, radius: EYE_SCREW.eyeRadius, fromAngle: FULL_TURN - JUNCTION_ANGLE, toAngle: JUNCTION_ANGLE }),
-    { type: 'Z' },
-  ];
+  return closed([...polyline(mirroredCorners(eyeScrewEdge, onAxis(EYE_SCREW.end))), ...outerSideOfEye()]);
+}
+
+function eyeHole() {
+  return circleAround({ center: EYE_SCREW.eyeCenter, radius: EYE_SCREW.eyeHoleRadius });
 }
 
 function drawEyeScrew() {
   return {
-    outline: [...solid(eyeScrewBody()), ...hollow(circleAround(EYE_SCREW.eyeCenter, EYE_SCREW.eyeHoleRadius))],
+    outline: [...solid(eyeScrewBody()), ...hollow(eyeHole())],
     strokes: diagonalThreadStrokes(EYE_SCREW),
   };
 }
 
 export const eyeScrew = {
   draw: drawEyeScrew,
-  thinnestDetail: Math.min(thinnestDetailOfThreadedShank(EYE_SCREW), EYE_SCREW.eyeRadius - EYE_SCREW.eyeHoleRadius),
+  thinnestDetail: Math.min(thinnestDetailOfThreadedShank(EYE_SCREW), EYE_RING_WIDTH),
 };

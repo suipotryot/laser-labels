@@ -1,4 +1,4 @@
-import { polyline } from '../contours.js';
+import { polyline, quadraticCurve } from '../contours.js';
 import { BOTTOM, TOP, atSide, mirroredOutline, onAxis, repeatedPositions, verticalStroke } from './lyingPiece.js';
 
 const NAIL = {
@@ -6,11 +6,11 @@ const NAIL = {
   headDepth: 0.1,
   headRounding: 0.04,
   shankRadius: 0.1,
-  shankEnd: 4,
-  end: 4.7,
-  bevelStart: 3.85,
-  bevelPoint: 4.35,
   notchCount: 6,
+  bevelStart: 3.85,
+  shankEnd: 4,
+  bevelPoint: 4.35,
+  end: 4.7,
 };
 
 function nailEdge(side) {
@@ -30,11 +30,11 @@ function gripNotches() {
 }
 
 function tipBevel() {
-  const bevelBend = { x: NAIL.shankEnd, distanceFromAxis: NAIL.shankRadius / 2 };
+  const bevelBendAt = (side) => atSide(NAIL.shankEnd, NAIL.shankRadius / 2, side);
   return [
     { type: 'M', ...atSide(NAIL.bevelStart, NAIL.shankRadius, TOP) },
-    { type: 'Q', x1: bevelBend.x, y1: TOP * bevelBend.distanceFromAxis, ...onAxis(NAIL.bevelPoint) },
-    { type: 'Q', x1: bevelBend.x, y1: BOTTOM * bevelBend.distanceFromAxis, ...atSide(NAIL.bevelStart, NAIL.shankRadius, BOTTOM) },
+    quadraticCurve(bevelBendAt(TOP), onAxis(NAIL.bevelPoint)),
+    quadraticCurve(bevelBendAt(BOTTOM), atSide(NAIL.bevelStart, NAIL.shankRadius, BOTTOM)),
   ];
 }
 

@@ -1,9 +1,14 @@
-import { polyline } from '../contours.js';
-import { BOTTOM, TOP, atSide, mirroredOutline, threadReachOf, verticalStroke, verticalStrokesAlong } from './lyingPiece.js';
+import {
+  atSide,
+  hexagonFaceEdgeDistanceFromAxis,
+  mirroredHorizontalStrokes,
+  mirroredOutline,
+  straightThreadStrokes,
+  verticalStroke,
+} from './lyingPiece.js';
 
 const BOLT = {
   headRadius: 0.55,
-  faceEdgeHeight: 0.55 * Math.cos(Math.PI / 3),
   chamfer: 0.08,
   headDepth: 0.6,
   shankRadius: 0.3,
@@ -24,28 +29,22 @@ function boltEdge(side) {
 }
 
 function hexHeadStrokes() {
-  const faceEdges = [TOP, BOTTOM].flatMap((side) => polyline([
-    atSide(BOLT.chamfer, BOLT.faceEdgeHeight, side),
-    atSide(BOLT.headDepth, BOLT.faceEdgeHeight, side),
-  ]));
-  return [
-    ...verticalStroke(BOLT.chamfer, BOLT.headRadius),
-    ...faceEdges,
-    ...verticalStroke(BOLT.headDepth, BOLT.shankRadius),
-  ];
+  const chamferLine = verticalStroke(BOLT.chamfer, BOLT.headRadius);
+  const faceEdges = mirroredHorizontalStrokes({
+    from: BOLT.chamfer,
+    to: BOLT.headDepth,
+    distanceFromAxis: hexagonFaceEdgeDistanceFromAxis(BOLT.headRadius),
+  });
+  const headEndLine = verticalStroke(BOLT.headDepth, BOLT.shankRadius);
+  return [...chamferLine, ...faceEdges, ...headEndLine];
 }
 
-function straightThreadStrokes() {
-  return verticalStrokesAlong({
-    from: BOLT.headDepth + BOLT.threadPitch,
-    to: BOLT.end - BOLT.chamfer,
-    pitch: BOLT.threadPitch,
-    halfLength: threadReachOf(BOLT),
-  });
+function shankThreadStrokes() {
+  return straightThreadStrokes(BOLT, { from: BOLT.headDepth + BOLT.threadPitch, to: BOLT.end - BOLT.chamfer });
 }
 
 function drawBolt() {
-  return { outline: mirroredOutline(boltEdge), strokes: [...hexHeadStrokes(), ...straightThreadStrokes()] };
+  return { outline: mirroredOutline(boltEdge), strokes: [...hexHeadStrokes(), ...shankThreadStrokes()] };
 }
 
 export const bolt = { draw: drawBolt, thinnestDetail: BOLT.chamfer };

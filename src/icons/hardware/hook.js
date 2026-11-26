@@ -1,4 +1,4 @@
-import { HALF_TURN, QUARTER_TURN, arc, pointOnCircle, polyline, reversedSegment, solid } from '../contours.js';
+import { FULL_TURN, HALF_TURN, QUARTER_TURN, arc, closed, cubicCurve, pointOnCircle, polyline, reversedSegment, solid } from '../contours.js';
 import {
   BOTTOM,
   TOP,
@@ -12,7 +12,7 @@ import {
 const HOOK = {
   loopCenter: { x: 0.67, y: 0 },
   loopRadius: 0.55,
-  loopEndAngle: (5 * Math.PI) / 3,
+  loopEndAngle: (5 / 6) * FULL_TURN,
   bendHandleLength: 0.45,
   shankStart: 1.6,
   collarStart: 1.95,
@@ -27,6 +27,8 @@ const HOOK = {
 };
 
 const LOOP_TOP = HOOK.loopCenter.y - HOOK.loopRadius;
+const LOOP_TOP_ANGLE = QUARTER_TURN;
+const COLLAR_STEP = HOOK.collarRadius - HOOK.shankRadius;
 
 function hookEdge(side) {
   return [
@@ -40,20 +42,16 @@ function hookEdge(side) {
 }
 
 function bendFromShankToLoopTop(side) {
-  const offset = side * HOOK.shankRadius;
-  return {
-    type: 'C',
-    x1: HOOK.shankStart - HOOK.bendHandleLength,
-    y1: offset,
-    x2: HOOK.loopCenter.x + HOOK.bendHandleLength,
-    y2: LOOP_TOP + offset,
-    x: HOOK.loopCenter.x,
-    y: LOOP_TOP + offset,
-  };
+  const wireEdgeOffset = side * HOOK.shankRadius;
+  return cubicCurve(
+    { x: HOOK.shankStart - HOOK.bendHandleLength, y: wireEdgeOffset },
+    { x: HOOK.loopCenter.x + HOOK.bendHandleLength, y: LOOP_TOP + wireEdgeOffset },
+    { x: HOOK.loopCenter.x, y: LOOP_TOP + wireEdgeOffset },
+  );
 }
 
 function innerSideOfLoop() {
-  return arc({ center: HOOK.loopCenter, radius: HOOK.loopRadius - HOOK.shankRadius, fromAngle: QUARTER_TURN, toAngle: HOOK.loopEndAngle });
+  return arc({ center: HOOK.loopCenter, radius: HOOK.loopRadius - HOOK.shankRadius, fromAngle: LOOP_TOP_ANGLE, toAngle: HOOK.loopEndAngle });
 }
 
 function roundedWireEnd() {
@@ -62,19 +60,23 @@ function roundedWireEnd() {
 }
 
 function outerSideOfLoop() {
-  return arc({ center: HOOK.loopCenter, radius: HOOK.loopRadius + HOOK.shankRadius, fromAngle: HOOK.loopEndAngle, toAngle: QUARTER_TURN });
+  return arc({ center: HOOK.loopCenter, radius: HOOK.loopRadius + HOOK.shankRadius, fromAngle: HOOK.loopEndAngle, toAngle: LOOP_TOP_ANGLE });
+}
+
+function bendBackFromLoopTopToShank() {
+  const topOfShankStart = hookEdge(TOP)[0];
+  return reversedSegment(bendFromShankToLoopTop(TOP), topOfShankStart);
 }
 
 function hookBody() {
-  return [
+  return closed([
     ...polyline(mirroredCorners(hookEdge, onAxis(HOOK.end))),
     bendFromShankToLoopTop(BOTTOM),
     ...innerSideOfLoop(),
     ...roundedWireEnd(),
     ...outerSideOfLoop(),
-    reversedSegment(bendFromShankToLoopTop(TOP), atSide(HOOK.shankStart, HOOK.shankRadius, TOP)),
-    { type: 'Z' },
-  ];
+    bendBackFromLoopTopToShank(),
+  ]);
 }
 
 function drawHook() {
@@ -83,5 +85,5 @@ function drawHook() {
 
 export const hook = {
   draw: drawHook,
-  thinnestDetail: Math.min(thinnestDetailOfThreadedShank(HOOK), HOOK.collarRadius - HOOK.shankRadius),
+  thinnestDetail: Math.min(thinnestDetailOfThreadedShank(HOOK), COLLAR_STEP),
 };

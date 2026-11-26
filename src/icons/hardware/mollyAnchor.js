@@ -1,5 +1,5 @@
 import { hollow, polygonWithRoundedCorners } from '../contours.js';
-import { BOTTOM, TOP, atSide, evenlySpacedPositions, mirroredOutline, verticalStroke } from './lyingPiece.js';
+import { BOTTOM, TOP, atSide, evenlySpacedPositions, mirroredOutline, taperedRadiusAt, verticalStroke } from './lyingPiece.js';
 
 const MOLLY_ANCHOR = {
   headRadius: 0.36,
@@ -16,12 +16,15 @@ const MOLLY_ANCHOR = {
   slotRadius: 0.13,
   slotHalfWidth: 0.05,
   coneStart: 3.15,
+  coneThreadPitch: 0.1,
   endRadius: 0.18,
   end: 3.55,
-  coneThreadPitch: 0.1,
 };
 
 const FLANGE_THICKNESS = MOLLY_ANCHOR.flangeEnd - MOLLY_ANCHOR.headDepth;
+const SLOT_WIDTH = 2 * MOLLY_ANCHOR.slotHalfWidth;
+const GAP_BETWEEN_SPIKE_AND_FLANGE_EDGE = MOLLY_ANCHOR.flangeRadius - MOLLY_ANCHOR.spikeRadius - MOLLY_ANCHOR.spikeHalfWidth;
+const GAP_BETWEEN_SPIKE_AND_SLEEVE = MOLLY_ANCHOR.spikeRadius - MOLLY_ANCHOR.spikeHalfWidth - MOLLY_ANCHOR.sleeveRadius;
 
 function flangeSpike(side) {
   return [
@@ -57,8 +60,7 @@ function expansionSlot(side) {
 }
 
 function coneRadiusAt(x) {
-  const progressAlongCone = (x - MOLLY_ANCHOR.coneStart) / (MOLLY_ANCHOR.end - MOLLY_ANCHOR.coneStart);
-  return MOLLY_ANCHOR.sleeveRadius + (MOLLY_ANCHOR.endRadius - MOLLY_ANCHOR.sleeveRadius) * progressAlongCone;
+  return taperedRadiusAt({ start: MOLLY_ANCHOR.coneStart, end: MOLLY_ANCHOR.end, startRadius: MOLLY_ANCHOR.sleeveRadius, endRadius: MOLLY_ANCHOR.endRadius }, x);
 }
 
 function coneThreadStrokes() {
@@ -69,15 +71,18 @@ function coneThreadStrokes() {
   }).flatMap((x) => verticalStroke(x, coneRadiusAt(x)));
 }
 
+function partingLines() {
+  return [
+    ...verticalStroke(MOLLY_ANCHOR.headDepth, MOLLY_ANCHOR.headRadius),
+    ...verticalStroke(MOLLY_ANCHOR.flangeEnd, MOLLY_ANCHOR.sleeveRadius),
+    ...verticalStroke(MOLLY_ANCHOR.coneStart, MOLLY_ANCHOR.sleeveRadius),
+  ];
+}
+
 function drawMollyAnchor() {
   return {
     outline: [...mirroredOutline(mollyAnchorEdge), ...expansionSlot(TOP), ...expansionSlot(BOTTOM)],
-    strokes: [
-      ...verticalStroke(MOLLY_ANCHOR.headDepth, MOLLY_ANCHOR.headRadius),
-      ...verticalStroke(MOLLY_ANCHOR.flangeEnd, MOLLY_ANCHOR.sleeveRadius),
-      ...verticalStroke(MOLLY_ANCHOR.coneStart, MOLLY_ANCHOR.sleeveRadius),
-      ...coneThreadStrokes(),
-    ],
+    strokes: [...partingLines(), ...coneThreadStrokes()],
   };
 }
 
@@ -85,9 +90,9 @@ export const mollyAnchor = {
   draw: drawMollyAnchor,
   thinnestDetail: Math.min(
     FLANGE_THICKNESS,
-    2 * MOLLY_ANCHOR.slotHalfWidth,
+    SLOT_WIDTH,
     MOLLY_ANCHOR.coneThreadPitch,
-    MOLLY_ANCHOR.flangeRadius - MOLLY_ANCHOR.spikeRadius - MOLLY_ANCHOR.spikeHalfWidth,
-    MOLLY_ANCHOR.spikeRadius - MOLLY_ANCHOR.spikeHalfWidth - MOLLY_ANCHOR.sleeveRadius,
+    GAP_BETWEEN_SPIKE_AND_FLANGE_EDGE,
+    GAP_BETWEEN_SPIKE_AND_SLEEVE,
   ),
 };

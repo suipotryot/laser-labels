@@ -8,8 +8,24 @@ export function polyline(points) {
   return [{ type: 'M', x: first.x, y: first.y }, ...others.map(({ x, y }) => ({ type: 'L', x, y }))];
 }
 
+export function quadraticCurve(control, end) {
+  return { type: 'Q', x1: control.x, y1: control.y, x: end.x, y: end.y };
+}
+
+export function cubicCurve(firstControl, secondControl, end) {
+  return { type: 'C', x1: firstControl.x, y1: firstControl.y, x2: secondControl.x, y2: secondControl.y, x: end.x, y: end.y };
+}
+
+export function closed(path) {
+  return [...path, { type: 'Z' }];
+}
+
 function polygon(corners) {
-  return [...polyline(corners), { type: 'Z' }];
+  return closed(polyline(corners));
+}
+
+function nextAround(items, index) {
+  return items[(index + 1) % items.length];
 }
 
 function towards(from, to, distance) {
@@ -23,27 +39,34 @@ function cornerSegments(corner, previous, next) {
   }
   const entry = towards(corner, previous, corner.rounding);
   const exit = towards(corner, next, corner.rounding);
-  return [{ type: 'L', ...entry }, { type: 'Q', x1: corner.x, y1: corner.y, x: exit.x, y: exit.y }];
+  return [{ type: 'L', ...entry }, quadraticCurve(corner, exit)];
 }
 
 function roundingOf(corner) {
   return corner.rounding ?? 0;
 }
 
+function isDrawableRounding(rounding) {
+  return rounding === undefined || (Number.isFinite(rounding) && rounding >= 0);
+}
+
 function doRoundingsOverflowASide(corners) {
   return corners.some((corner, index) => {
-    const next = corners[(index + 1) % corners.length];
+    const next = nextAround(corners, index);
     const sideLength = Math.hypot(next.x - corner.x, next.y - corner.y);
     return roundingOf(corner) + roundingOf(next) > sideLength + FLOATING_POINT_TOLERANCE;
   });
 }
 
 export function polygonWithRoundedCorners(corners) {
+  if (!corners.every(({ rounding }) => isDrawableRounding(rounding))) {
+    throw new Error('Roundings must be finite positive numbers');
+  }
   if (doRoundingsOverflowASide(corners)) {
     throw new Error('Roundings longer than their side would make the outline cross itself');
   }
-  const [first, ...others] = corners.flatMap((corner, index) => cornerSegments(corner, corners.at(index - 1), corners[(index + 1) % corners.length]));
-  return [{ type: 'M', x: first.x, y: first.y }, ...others, { type: 'Z' }];
+  const [first, ...others] = corners.flatMap((corner, index) => cornerSegments(corner, corners.at(index - 1), nextAround(corners, index)));
+  return closed([{ type: 'M', x: first.x, y: first.y }, ...others]);
 }
 
 export function rectangle({ halfWidth, halfHeight }) {
@@ -56,7 +79,7 @@ export function rectangle({ halfWidth, halfHeight }) {
 }
 
 export function evenlySpacedAngle(index, count) {
-  return (2 * Math.PI * index) / count;
+  return (FULL_TURN * index) / count;
 }
 
 export function alternating(first, second, count) {
@@ -85,7 +108,7 @@ export function taperedCross({ armLength, tipHalfWidth, rootHalfWidth }) {
 }
 
 function sideTowardNextArm({ angle, halfWidth }) {
-  return pointAtAngle(halfWidth, angle + Math.PI / 2);
+  return pointAtAngle(halfWidth, angle + QUARTER_TURN);
 }
 
 function tipCornersOf(arm) {
@@ -128,13 +151,17 @@ function cornerBetween(arm, nextArm) {
 }
 
 export function starOfArms(arms) {
-  const corners = arms.flatMap((arm, index) => [...tipCornersOf(arm), cornerBetween(arm, arms[(index + 1) % arms.length])]);
+  const corners = arms.flatMap((arm, index) => [...tipCornersOf(arm), cornerBetween(arm, nextAround(arms, index))]);
   return polygon(corners);
 }
 
 export function regularPolygon({ cornerCount, radius }) {
   const corners = Array.from({ length: cornerCount }, (_, index) => pointAtAngle(radius, evenlySpacedAngle(index, cornerCount)));
   return polygon(corners);
+}
+
+export function apothemOf({ cornerCount, radius }) {
+  return radius * Math.cos(HALF_TURN / cornerCount);
 }
 
 function midpoint(from, to) {
@@ -144,10 +171,10 @@ function midpoint(from, to) {
 function roundedPolygon(corners) {
   const start = midpoint(corners.at(-1), corners[0]);
   const curves = corners.map((corner, index) => {
-    const end = midpoint(corner, corners[(index + 1) % corners.length]);
-    return { type: 'Q', x1: corner.x, y1: corner.y, x: end.x, y: end.y };
+    const end = midpoint(corner, nextAround(corners, index));
+    return quadraticCurve(corner, end);
   });
-  return [{ type: 'M', x: start.x, y: start.y }, ...curves, { type: 'Z' }];
+  return closed([{ type: 'M', x: start.x, y: start.y }, ...curves]);
 }
 
 export function roundedStar({ lobeCount, outerRadius, innerRadius }) {
@@ -169,39 +196,47 @@ function tangentTowardsIncreasingAngle(angle, length) {
   return { x: -Math.sin(angle) * length, y: -Math.cos(angle) * length };
 }
 
-function arcPieceUpToAQuarter({ center, radius }, fromAngle, toAngle) {
-  const handle = (4 / 3) * Math.tan((toAngle - fromAngle) / 4) * radius;
-  const start = pointOnCircle({ center, radius }, fromAngle);
-  const end = pointOnCircle({ center, radius }, toAngle);
+function bezierHandleLengthFor(sweep, radius) {
+  return (4 / 3) * Math.tan(sweep / 4) * radius;
+}
+
+function arcPieceUpToAQuarter(circleOnScreen, fromAngle, toAngle) {
+  const handle = bezierHandleLengthFor(toAngle - fromAngle, circleOnScreen.radius);
+  const start = pointOnCircle(circleOnScreen, fromAngle);
+  const end = pointOnCircle(circleOnScreen, toAngle);
   const startTangent = tangentTowardsIncreasingAngle(fromAngle, handle);
   const endTangent = tangentTowardsIncreasingAngle(toAngle, handle);
-  return {
-    type: 'C',
-    x1: start.x + startTangent.x,
-    y1: start.y + startTangent.y,
-    x2: end.x - endTangent.x,
-    y2: end.y - endTangent.y,
-    x: end.x,
-    y: end.y,
-  };
+  return cubicCurve(
+    { x: start.x + startTangent.x, y: start.y + startTangent.y },
+    { x: end.x - endTangent.x, y: end.y - endTangent.y },
+    end,
+  );
 }
 
 function quarterTurnAnglesStrictlyBetween(fromAngle, toAngle) {
   const low = Math.min(fromAngle, toAngle);
   const high = Math.max(fromAngle, toAngle);
-  const angles = [];
-  for (let angle = Math.ceil(low / QUARTER_TURN) * QUARTER_TURN; angle < high - FLOATING_POINT_TOLERANCE; angle += QUARTER_TURN) {
-    if (angle > low + FLOATING_POINT_TOLERANCE) {
-      angles.push(angle);
-    }
-  }
+  const firstQuarterTurn = Math.ceil(low / QUARTER_TURN);
+  const quarterTurnCount = Math.floor(high / QUARTER_TURN) - firstQuarterTurn + 1;
+  const angles = Array.from({ length: quarterTurnCount }, (_, index) => (firstQuarterTurn + index) * QUARTER_TURN)
+    .filter((angle) => angle > low + FLOATING_POINT_TOLERANCE && angle < high - FLOATING_POINT_TOLERANCE);
   return fromAngle < toAngle ? angles : angles.reverse();
 }
 
-export function arc({ center, radius, fromAngle, toAngle }) {
+function throwIfArcCannotBeDrawn({ center, radius, fromAngle, toAngle }) {
   if (!Number.isFinite(fromAngle) || !Number.isFinite(toAngle)) {
     throw new Error('Arc angles must be finite numbers');
   }
+  if (!Number.isFinite(radius)) {
+    throw new Error('Arc radius must be a finite number');
+  }
+  if (!Number.isFinite(center.x) || !Number.isFinite(center.y)) {
+    throw new Error('Arc center must be made of finite numbers');
+  }
+}
+
+export function arc({ center, radius, fromAngle, toAngle }) {
+  throwIfArcCannotBeDrawn({ center, radius, fromAngle, toAngle });
   if (fromAngle === toAngle) {
     return [];
   }
@@ -209,13 +244,13 @@ export function arc({ center, radius, fromAngle, toAngle }) {
   return angles.slice(1).map((angle, index) => arcPieceUpToAQuarter({ center, radius }, angles[index], angle));
 }
 
-export function circleAround(center, radius) {
+export function circleAround({ center, radius }) {
   const start = pointOnCircle({ center, radius }, 0);
-  return [{ type: 'M', ...start }, ...arc({ center, radius, fromAngle: 0, toAngle: -FULL_TURN }), { type: 'Z' }];
+  return closed([{ type: 'M', ...start }, ...arc({ center, radius, fromAngle: 0, toAngle: -FULL_TURN })]);
 }
 
 export function circle(radius) {
-  return circleAround({ x: 0, y: 0 }, radius);
+  return circleAround({ center: { x: 0, y: 0 }, radius });
 }
 
 const COORDINATE_PAIRS = [['x', 'y'], ['x1', 'y1'], ['x2', 'y2']];
@@ -274,7 +309,7 @@ export function placeTogetherInBox(drawings, box) {
 function signedAreaOnScreen(contour) {
   const points = contour.filter((command) => command.type !== 'Z');
   return points.reduce((area, point, index) => {
-    const next = points[(index + 1) % points.length];
+    const next = nextAround(points, index);
     return area + (point.x * next.y - next.x * point.y) / 2;
   }, 0);
 }
@@ -283,8 +318,8 @@ function isClockwiseOnScreen(contour) {
   return signedAreaOnScreen(contour) > 0;
 }
 
-export function reversedSegment(segment, start) {
-  const end = { x: start.x, y: start.y };
+export function reversedSegment(segment, originalStart) {
+  const end = { x: originalStart.x, y: originalStart.y };
   if (segment.type === 'L') {
     return { type: 'L', ...end };
   }
@@ -301,7 +336,7 @@ function reversed(contour) {
   const [move, ...segments] = contour.filter((command) => command.type !== 'Z');
   const reversedSegments = segments.map((segment, index) => reversedSegment(segment, index === 0 ? move : segments[index - 1]));
   const lastEnd = segments.at(-1);
-  return [{ type: 'M', x: lastEnd.x, y: lastEnd.y }, ...reversedSegments.reverse(), { type: 'Z' }];
+  return closed([{ type: 'M', x: lastEnd.x, y: lastEnd.y }, ...reversedSegments.reverse()]);
 }
 
 export function hollow(contour) {

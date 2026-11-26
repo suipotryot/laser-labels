@@ -71,12 +71,13 @@ describe('placeTogetherInBox', () => {
 });
 
 const CIRCLE_TOLERANCE = 0.01;
+const SAMPLE_PROGRESSES = [0.25, 0.5, 0.75, 1];
 
 function samplesAlong(start, segments) {
   const samples = [];
   let segmentStart = start;
   for (const segment of segments) {
-    for (const progress of [0.25, 0.5, 0.75, 1]) {
+    for (const progress of SAMPLE_PROGRESSES) {
       samples.push(pointOnCubicCurve(segmentStart, segment, progress));
     }
     segmentStart = { x: segment.x, y: segment.y };
@@ -105,14 +106,19 @@ describe('arc', () => {
     }
   }
 
+  function assertEndsAt(samples, angle) {
+    const end = samples.at(-1);
+    const expectedEnd = pointAt(angle);
+    assert.ok(isAlmostEqual(end.x, expectedEnd.x) && isAlmostEqual(end.y, expectedEnd.y), 'the arc does not end at the last angle');
+  }
+
   it('should follow the circle counterclockwise on screen when the end angle is larger', () => {
     const samples = samplesAlong(pointAt(0), arc({ ...circleOnScreen, fromAngle: 0, toAngle: (3 * Math.PI) / 2 }));
 
     assertFollowsTheCircle(samples);
     const firstSampleAngle = angleOnScreen(circleOnScreen.center, samples[0]);
     assert.ok(firstSampleAngle > 0 && firstSampleAngle < Math.PI / 2, 'the arc does not start counterclockwise');
-    const end = samples.at(-1);
-    assert.ok(isAlmostEqual(end.x, pointAt((3 * Math.PI) / 2).x) && isAlmostEqual(end.y, pointAt((3 * Math.PI) / 2).y), 'the arc does not end at the last angle');
+    assertEndsAt(samples, (3 * Math.PI) / 2);
   });
 
   it('should follow the circle clockwise on screen when the end angle is smaller', () => {
@@ -121,8 +127,7 @@ describe('arc', () => {
     assertFollowsTheCircle(samples);
     const firstSampleAngle = angleOnScreen(circleOnScreen.center, samples[0]);
     assert.ok(firstSampleAngle > 0 && firstSampleAngle < Math.PI / 2, 'the arc does not start clockwise');
-    const end = samples.at(-1);
-    assert.ok(isAlmostEqual(end.x, pointAt(-Math.PI).x) && isAlmostEqual(end.y, pointAt(-Math.PI).y), 'the arc does not end at the last angle');
+    assertEndsAt(samples, -Math.PI);
   });
 
   it('should draw nothing when the arc starts and ends at the same angle', () => {
@@ -132,6 +137,15 @@ describe('arc', () => {
   it('should refuse an angle that is not a finite number', () => {
     assert.throws(() => arc({ ...circleOnScreen, fromAngle: 0, toAngle: Number.NaN }), /Arc angles must be finite numbers/);
     assert.throws(() => arc({ ...circleOnScreen, fromAngle: 0, toAngle: Infinity }), /Arc angles must be finite numbers/);
+    assert.throws(() => arc({ ...circleOnScreen, fromAngle: Number.NaN, toAngle: 0 }), /Arc angles must be finite numbers/);
+  });
+
+  it('should refuse a radius that is not a finite number', () => {
+    assert.throws(() => arc({ ...circleOnScreen, radius: Number.NaN, fromAngle: 0, toAngle: 1 }), /Arc radius must be a finite number/);
+  });
+
+  it('should refuse a center that is not made of finite numbers', () => {
+    assert.throws(() => arc({ ...circleOnScreen, center: { x: 0, y: Number.NaN }, fromAngle: 0, toAngle: 1 }), /Arc center must be made of finite numbers/);
   });
 });
 
@@ -145,5 +159,17 @@ describe('polygonWithRoundedCorners', () => {
     ];
 
     assert.throws(() => polygonWithRoundedCorners(corners), /Roundings longer than their side/);
+  });
+
+  it('should refuse a rounding that is not a finite number', () => {
+    const corners = [{ x: 0, y: 0, rounding: Number.NaN }, { x: 1, y: 0 }, { x: 1, y: 2 }];
+
+    assert.throws(() => polygonWithRoundedCorners(corners), /Roundings must be finite positive numbers/);
+  });
+
+  it('should refuse a negative rounding', () => {
+    const corners = [{ x: 0, y: 0, rounding: -0.1 }, { x: 1, y: 0 }, { x: 1, y: 2 }];
+
+    assert.throws(() => polygonWithRoundedCorners(corners), /Roundings must be finite positive numbers/);
   });
 });

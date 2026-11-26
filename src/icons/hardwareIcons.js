@@ -8,21 +8,21 @@ import { eyeScrew } from './hardware/eyeScrew.js';
 import { wallPlug } from './hardware/wallPlug.js';
 import { mollyAnchor } from './hardware/mollyAnchor.js';
 
-const HARDWARE_DRAWINGS = { screw, nail, bolt, nut, hook, eyeScrew, wallPlug, mollyAnchor };
+const HARDWARE_ICONS = { screw, nail, bolt, nut, hook, eyeScrew, wallPlug, mollyAnchor };
 
-function hardwareDrawingOf(hardwareTypeKey) {
-  if (!Object.hasOwn(HARDWARE_DRAWINGS, hardwareTypeKey)) {
+function hardwareIconOf(hardwareTypeKey) {
+  if (!Object.hasOwn(HARDWARE_ICONS, hardwareTypeKey)) {
     throw new Error(`No icon for hardware type: ${hardwareTypeKey}`);
   }
-  return HARDWARE_DRAWINGS[hardwareTypeKey];
+  return HARDWARE_ICONS[hardwareTypeKey];
 }
 
 export function drawHardwareIcon(hardwareTypeKey) {
-  return hardwareDrawingOf(hardwareTypeKey).draw();
+  return hardwareIconOf(hardwareTypeKey).draw();
 }
 
 export function thinnestHardwareDetail(hardwareTypeKey) {
-  return hardwareDrawingOf(hardwareTypeKey).thinnestDetail;
+  return hardwareIconOf(hardwareTypeKey).thinnestDetail;
 }
 
 export function aspectRatioOfHardwareIcon(hardwareTypeKey) {

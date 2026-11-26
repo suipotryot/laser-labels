@@ -3,8 +3,10 @@ import {
   BOTTOM,
   TOP,
   atSide,
+  mirroredHorizontalStrokes,
   mirroredOutline,
   repeatedPositions,
+  taperedRadiusAt,
   verticalStroke,
   verticalStrokesAlong,
 } from './lyingPiece.js';
@@ -20,7 +22,7 @@ const WALL_PLUG = {
   wingTip: 0.28,
   wingReach: 0.12,
   finRise: 0.05,
-  finStart: 0.9,
+  firstFinStart: 0.9,
   finPitch: 0.22,
   finLength: 0.187,
   finCount: 9,
@@ -30,19 +32,21 @@ const WALL_PLUG = {
   end: 3.1,
 };
 
-function wallPlugRadiusAt(x) {
-  const progressAlongBody = (x - WALL_PLUG.collarDepth) / (WALL_PLUG.end - WALL_PLUG.collarDepth);
-  return WALL_PLUG.bodyRadius + (WALL_PLUG.endRadius - WALL_PLUG.bodyRadius) * progressAlongBody;
+const FLAT_BETWEEN_FINS = WALL_PLUG.finPitch - WALL_PLUG.finLength;
+const GAP_BETWEEN_RAILS = 2 * WALL_PLUG.railRadius;
+
+function bodyRadiusAt(x) {
+  return taperedRadiusAt({ start: WALL_PLUG.collarDepth, end: WALL_PLUG.end, startRadius: WALL_PLUG.bodyRadius, endRadius: WALL_PLUG.endRadius }, x);
 }
 
-function finEdge(side) {
-  return repeatedPositions({ from: WALL_PLUG.finStart, pitch: WALL_PLUG.finPitch, count: WALL_PLUG.finCount })
+function finsAlong(side) {
+  return repeatedPositions({ from: WALL_PLUG.firstFinStart, pitch: WALL_PLUG.finPitch, count: WALL_PLUG.finCount })
     .flatMap((finStart) => {
       const finEnd = finStart + WALL_PLUG.finLength;
       return [
-        atSide(finStart, wallPlugRadiusAt(finStart), side),
-        atSide(finStart, wallPlugRadiusAt(finStart) + WALL_PLUG.finRise, side),
-        atSide(finEnd, wallPlugRadiusAt(finEnd), side),
+        atSide(finStart, bodyRadiusAt(finStart), side),
+        atSide(finStart, bodyRadiusAt(finStart) + WALL_PLUG.finRise, side),
+        atSide(finEnd, bodyRadiusAt(finEnd), side),
       ];
     });
 }
@@ -52,27 +56,25 @@ function wallPlugEdge(side) {
     { ...atSide(0, WALL_PLUG.collarRadius, side), rounding: WALL_PLUG.collarRounding },
     { ...atSide(WALL_PLUG.collarDepth, WALL_PLUG.collarRadius, side), rounding: WALL_PLUG.collarRounding },
     atSide(WALL_PLUG.collarDepth, WALL_PLUG.bodyRadius, side),
-    ...finEdge(side),
+    ...finsAlong(side),
     { ...atSide(WALL_PLUG.end, WALL_PLUG.endRadius, side), rounding: WALL_PLUG.endRounding },
   ];
 }
 
 function antiRotationWings() {
   return [TOP, BOTTOM].flatMap((side) => polyline([
-    atSide(WALL_PLUG.wingRoot, wallPlugRadiusAt(WALL_PLUG.wingRoot), side),
+    atSide(WALL_PLUG.wingRoot, bodyRadiusAt(WALL_PLUG.wingRoot), side),
     atSide(WALL_PLUG.wingTip, WALL_PLUG.bodyRadius + WALL_PLUG.wingReach, side),
   ]));
 }
 
 function ladder() {
   const railEnd = WALL_PLUG.end - WALL_PLUG.endRounding;
-  const rails = [TOP, BOTTOM].flatMap((side) => polyline([
-    atSide(WALL_PLUG.railStart, WALL_PLUG.railRadius, side),
-    atSide(railEnd, WALL_PLUG.railRadius, side),
-  ]));
+  const lastRungLimit = railEnd - WALL_PLUG.rungPitch / 2;
+  const rails = mirroredHorizontalStrokes({ from: WALL_PLUG.railStart, to: railEnd, distanceFromAxis: WALL_PLUG.railRadius });
   const rungs = verticalStrokesAlong({
     from: WALL_PLUG.railStart + WALL_PLUG.rungPitch,
-    to: railEnd - WALL_PLUG.rungPitch / 2,
+    to: lastRungLimit,
     pitch: WALL_PLUG.rungPitch,
     halfLength: WALL_PLUG.railRadius,
   });
@@ -88,5 +90,5 @@ function drawWallPlug() {
 
 export const wallPlug = {
   draw: drawWallPlug,
-  thinnestDetail: Math.min(WALL_PLUG.finRise, WALL_PLUG.finPitch - WALL_PLUG.finLength, 2 * WALL_PLUG.railRadius),
+  thinnestDetail: Math.min(WALL_PLUG.finRise, FLAT_BETWEEN_FINS, GAP_BETWEEN_RAILS),
 };
