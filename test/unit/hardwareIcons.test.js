@@ -441,6 +441,25 @@ describe('drawHardwareIcon', () => {
     assert.ok(Math.max(...threads.map(([start]) => start.x)) > rod.extent.right - lengthOf(rod.extent) / 10, 'threads do not reach the right end');
   });
 
+  it('should draw a blind rivet with a thin mandrel on the left, then a flange as tall as the drawing, then its body', () => {
+    const rivet = silhouetteOf('rivet');
+
+    const flangePoints = rivet.points.filter(({ y }) => isAlmostEqual(y, rivet.extent.top));
+    const flangeStart = Math.min(...flangePoints.map(({ x }) => x));
+    const mandrelRadius = Math.max(...rivet.points.filter(({ x, y }) => y < 0 && x < flangeStart).map(({ y }) => -y));
+    assert.ok(flangeStart > rivet.extent.left + lengthOf(rivet.extent) / 4, 'the mandrel is not on the left');
+    assert.ok(mandrelRadius < heightOf(rivet.extent) / 4, 'the mandrel is not thin');
+    assert.ok(hasFlatEnd(rivet), 'the end is not flat');
+  });
+
+  it('should draw the mandrel of the blind rivet through its body', () => {
+    const rivet = silhouetteOf('rivet');
+
+    const flangeEnd = Math.max(...rivet.points.filter(({ y }) => isAlmostEqual(y, rivet.extent.top)).map(({ x }) => x));
+    const mandrelLines = rivet.strokes.filter((stroke) => isHorizontal(stroke) && stroke.every(({ x }) => x >= flangeEnd));
+    assert.equal(mandrelLines.length, 2, 'the mandrel does not go through the body');
+  });
+
   it('should draw a washer seen from the front as a round disc with a hollow round hole, without strokes', () => {
     const { outline, strokes } = drawHardwareIcon('washer');
 
