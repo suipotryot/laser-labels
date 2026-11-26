@@ -4,8 +4,8 @@ import { aspectRatioOfHardwareIcon, drawHardwareIcon, thinnestHardwareDetail } f
 import { hardwareTypes } from '../../src/catalog/hardwareTypes.js';
 import { contoursOf, cornersOf, extentOf, isAlmostEqual, onCurvePointsOf, windingOf } from './helpers/geometry.js';
 
-const HARDWARE_SEEN_FROM_THE_FRONT = ['nut'];
-const HARDWARE_WITH_HOLES = ['nut', 'eyeScrew', 'mollyAnchor'];
+const HARDWARE_SEEN_FROM_THE_FRONT = ['nut', 'washer'];
+const HARDWARE_WITH_HOLES = ['nut', 'washer', 'eyeScrew', 'mollyAnchor'];
 
 function silhouetteOf(hardwareTypeKey) {
   const { outline, strokes } = drawHardwareIcon(hardwareTypeKey);
@@ -20,6 +20,10 @@ function lengthOf(extent) {
 
 function heightOf(extent) {
   return extent.bottom - extent.top;
+}
+
+function halfHeightOf(extent) {
+  return heightOf(extent) / 2;
 }
 
 function fractionAlong(extent, fraction) {
@@ -46,6 +50,11 @@ function tallestPointsOf({ points, extent }) {
   return points.filter(({ y }) => isAlmostEqual(y, extent.top));
 }
 
+function tallestSpanOf(silhouette) {
+  const { left, right } = extentOf(tallestPointsOf(silhouette));
+  return { start: left, end: right };
+}
+
 function hasPointedTipOnAxis({ points, extent }) {
   const tip = pointsAt(points, extent.right);
   return tip.length === 1 && isAlmostEqual(tip[0].y, 0);
@@ -53,6 +62,10 @@ function hasPointedTipOnAxis({ points, extent }) {
 
 function hasFlatEnd({ points, extent }) {
   return pointsAt(points, extent.right).length === 2;
+}
+
+function hasFlatStart({ points, extent }) {
+  return pointsAt(points, extent.left).length === 2;
 }
 
 function shankRadiusOf(points) {
@@ -90,6 +103,43 @@ function stepsAlongTopEdge(points) {
 
 function firstStepAlongTopEdge(points) {
   return stepsAlongTopEdge(points)[0];
+}
+
+function isAtOrBefore(x, limit) {
+  return x < limit || isAlmostEqual(x, limit);
+}
+
+function isStrictlyBetween(value, low, high) {
+  return value > low && value < high && !isAlmostEqual(value, low) && !isAlmostEqual(value, high);
+}
+
+function anchorBoltPartsOf(anchorBolt) {
+  const shankRadius = firstStepAlongTopEdge(anchorBolt.points).narrowerRadius;
+  const washer = tallestSpanOf(anchorBolt);
+  const isNutPoint = (point) => isAboveAxis(point)
+    && isAtOrBefore(point.x, washer.start)
+    && isStrictlyBetween(distanceFromAxisOf(point), shankRadius, halfHeightOf(anchorBolt.extent));
+  const nut = extentOf(anchorBolt.points.filter(isNutPoint));
+  const isClipPoint = (point) => isAboveAxis(point) && point.x > washer.end && distanceFromAxisOf(point) > shankRadius && point.x < anchorBolt.extent.right;
+  const clip = extentOf(anchorBolt.points.filter(isClipPoint));
+  return {
+    shankRadius,
+    washer,
+    nut: { start: nut.left, end: nut.right, radius: -nut.top },
+    clip: { start: clip.left, end: clip.right },
+  };
+}
+
+function bodyEndOf(rivet) {
+  const flange = tallestSpanOf(rivet);
+  const bodyRadius = stepsAlongTopEdge(rivet.points).find(({ x }) => isAlmostEqual(x, flange.end)).narrowerRadius;
+  return extentOf(rivet.points.filter((point) => isAboveAxis(point) && isAlmostEqual(distanceFromAxisOf(point), bodyRadius))).right;
+}
+
+function threadsOfAnchorBolt(anchorBolt) {
+  const { shankRadius, nut } = anchorBoltPartsOf(anchorBolt);
+  const isShorterThanTheNut = (stroke) => verticalSpanOf(stroke) < 2 * nut.radius;
+  return anchorBolt.strokes.filter((stroke) => isVertical(stroke) && crossesEdges(stroke, shankRadius) && isShorterThanTheNut(stroke));
 }
 
 function isStraight(stroke) {
@@ -148,11 +198,6 @@ function thinnestDetailOfThreadedShank({ points, strokes }) {
 
 function collarEndOf(wallPlug) {
   return firstStepAlongTopEdge(wallPlug.points).x;
-}
-
-function flangeOf(molly) {
-  const { left, right } = extentOf(tallestPointsOf(molly));
-  return { start: left, end: right };
 }
 
 function coneThreadsOf(molly) {
@@ -375,7 +420,7 @@ describe('drawHardwareIcon', () => {
   it('should draw a Molly anchor with a head, then a flange as tall as the drawing with two spikes, and a flat end', () => {
     const molly = silhouetteOf('mollyAnchor');
 
-    const flange = flangeOf(molly);
+    const flange = tallestSpanOf(molly);
     assert.ok(flange.end < fractionAlong(molly.extent, 1 / 6), 'no flange on the left');
     assert.ok(flange.start > molly.extent.left, 'no head before the flange');
     const isNearTheFlange = (x) => x > flange.end && x < fractionAlong(molly.extent, 1 / 4);
@@ -414,12 +459,180 @@ describe('drawHardwareIcon', () => {
   it('should draw lines across the Molly anchor where the head meets the flange and where the flange meets the sleeve', () => {
     const molly = silhouetteOf('mollyAnchor');
 
-    const flange = flangeOf(molly);
+    const flange = tallestSpanOf(molly);
     const headRadius = Math.max(...molly.points.filter((point) => isAboveAxis(point) && point.x < flange.start).map(distanceFromAxisOf));
     const lineAtFlangeStart = verticalLineAt(molly.strokes, flange.start);
     assert.ok(lineAtFlangeStart, 'no line between the head and the flange');
     assert.ok(isAlmostEqual(verticalSpanOf(lineAtFlangeStart), 2 * headRadius), 'the line does not span exactly the head');
     assert.ok(verticalLineAt(molly.strokes, flange.end), 'no line between the flange and the sleeve');
+  });
+
+  it('should draw a threaded rod without head, with flat ends on both sides', () => {
+    const rod = silhouetteOf('threadedRod');
+
+    assert.ok(hasFlatEnd(rod), 'the right end is not flat');
+    assert.ok(hasFlatStart(rod), 'the left end is not flat');
+    const thickestPoints = rod.points.filter((point) => isAlmostEqual(distanceFromAxisOf(point), halfHeightOf(rod.extent)));
+    assert.ok(lengthOf(extentOf(thickestPoints)) > 0.9 * lengthOf(rod.extent), 'the rod does not keep its thickness along its length');
+  });
+
+  it('should draw straight threads crossing the edges along the whole threaded rod', () => {
+    const rod = silhouetteOf('threadedRod');
+
+    const threads = rod.strokes.filter(isVertical);
+    const threadSpan = extentOf(threads.flat());
+    assert.ok(threads.every((thread) => crossesEdges(thread, halfHeightOf(rod.extent))), 'threads do not cross the edges');
+    assert.ok(threadSpan.left < fractionAlong(rod.extent, 1 / 10), 'threads do not start near the left end');
+    assert.ok(threadSpan.right > fractionAlong(rod.extent, 9 / 10), 'threads do not reach the right end');
+  });
+
+  it('should start and end the threads of the threaded rod on the corners of its chamfers', () => {
+    const rod = silhouetteOf('threadedRod');
+
+    const threadSpan = extentOf(rod.strokes.filter(isVertical).flat());
+    const fullThickness = tallestSpanOf(rod);
+    assert.ok(isAlmostEqual(threadSpan.left, fullThickness.start), 'the threads do not start on the left chamfer corner');
+    assert.ok(isAlmostEqual(threadSpan.right, fullThickness.end), 'the threads do not end on the right chamfer corner');
+  });
+
+  it('should draw a blind rivet with a thin mandrel on the left, then the flange, then a body wider than the mandrel up to near its flat end', () => {
+    const rivet = silhouetteOf('rivet');
+
+    const flange = tallestSpanOf(rivet);
+    const mandrelRadius = Math.max(...rivet.points.filter((point) => isAboveAxis(point) && point.x < flange.start).map(distanceFromAxisOf));
+    const bodyRadius = stepsAlongTopEdge(rivet.points).find(({ x }) => isAlmostEqual(x, flange.end)).narrowerRadius;
+    assert.ok(flange.start > fractionAlong(rivet.extent, 1 / 4), 'the mandrel is not on the left');
+    assert.ok(mandrelRadius < heightOf(rivet.extent) / 4, 'the mandrel is not thin');
+    assert.ok(bodyRadius > mandrelRadius && bodyRadius < halfHeightOf(rivet.extent), 'the body is not between the mandrel and the flange');
+    assert.ok(bodyEndOf(rivet) > fractionAlong(rivet.extent, 9 / 10), 'the body does not reach near the end');
+    assert.ok(hasFlatEnd(rivet), 'the end is not flat');
+  });
+
+  it('should not draw any horizontal line inside the body of the blind rivet', () => {
+    const rivet = silhouetteOf('rivet');
+
+    assert.equal(rivet.strokes.filter(isHorizontal).length, 0);
+  });
+
+  it('should draw an anchor bolt with a nut and then a washer, wider than the nut, near its flat left end', () => {
+    const anchorBolt = silhouetteOf('anchorBolt');
+
+    const { washer, nut } = anchorBoltPartsOf(anchorBolt);
+    assert.ok(washer.end < fractionAlong(anchorBolt.extent, 1 / 3), 'the washer is not near the left end');
+    assert.ok(nut.start < washer.start && isAlmostEqual(nut.end, washer.start), 'no nut just before the washer');
+    assert.ok(hasFlatStart(anchorBolt), 'the shank does not end flat on the left');
+  });
+
+  it('should draw an expansion clip and a cone widening to a flat end on the right of the anchor bolt', () => {
+    const anchorBolt = silhouetteOf('anchorBolt');
+
+    const { shankRadius, clip } = anchorBoltPartsOf(anchorBolt);
+    const endRadius = halfHeightOf(extentOf(pointsAt(anchorBolt.points, anchorBolt.extent.right)));
+    assert.ok(clip.start > fractionAlong(anchorBolt.extent, 2 / 3), 'no expansion clip on the right');
+    assert.ok(hasFlatEnd(anchorBolt), 'the end is not flat');
+    assert.ok(endRadius > shankRadius, 'the cone does not widen');
+  });
+
+  it('should draw threads on the anchor bolt shank on both sides of the nut and washer, not under them', () => {
+    const anchorBolt = silhouetteOf('anchorBolt');
+
+    const { nut, washer } = anchorBoltPartsOf(anchorBolt);
+    const threads = threadsOfAnchorBolt(anchorBolt);
+    const isUnderTheNutOrTheWasher = ([start]) => start.x > nut.start && start.x < washer.end;
+    assert.ok(threads.some(([start]) => start.x < nut.start), 'no threads left of the nut');
+    assert.ok(threads.some(([start]) => start.x > washer.end), 'no threads right of the washer');
+    assert.ok(threads.every((thread) => !isUnderTheNutOrTheWasher(thread)), 'threads run under the nut or the washer');
+  });
+
+  it('should draw the face edges of the anchor bolt nut along the nut, between the shank and the nut corners', () => {
+    const anchorBolt = silhouetteOf('anchorBolt');
+
+    const { shankRadius, nut } = anchorBoltPartsOf(anchorBolt);
+    const faceEdges = anchorBolt.strokes.filter((stroke) => isHorizontal(stroke) && !isAlmostEqual(stroke[0].y, 0));
+    assert.equal(faceEdges.length, 2);
+    for (const faceEdge of faceEdges) {
+      const { left, right } = extentOf(faceEdge);
+      assert.ok(isAlmostEqual(left, nut.start) && isAlmostEqual(right, nut.end), 'a face edge does not run along the nut');
+      assert.ok(isStrictlyBetween(distanceFromAxisOf(faceEdge[0]), shankRadius, nut.radius), 'a face edge is not between the shank and the corners');
+    }
+  });
+
+  it('should draw a line across the anchor bolt where the nut meets the washer', () => {
+    const anchorBolt = silhouetteOf('anchorBolt');
+
+    const { nut, washer } = anchorBoltPartsOf(anchorBolt);
+    const lineAtWasherStart = verticalLineAt(anchorBolt.strokes, washer.start);
+    assert.ok(lineAtWasherStart, 'no line between the nut and the washer');
+    assert.ok(isAlmostEqual(verticalSpanOf(lineAtWasherStart), 2 * nut.radius), 'the line does not span exactly the nut');
+  });
+
+  it('should draw a line across the anchor bolt on the left of the nut', () => {
+    const anchorBolt = silhouetteOf('anchorBolt');
+
+    const { nut } = anchorBoltPartsOf(anchorBolt);
+    const lineAtNutStart = verticalLineAt(anchorBolt.strokes, nut.start);
+    assert.ok(lineAtNutStart, 'no line on the left of the nut');
+    assert.ok(isAlmostEqual(verticalSpanOf(lineAtNutStart), 2 * nut.radius), 'the line does not span exactly the nut');
+  });
+
+  it('should draw a line across the anchor bolt on the right of the washer', () => {
+    const anchorBolt = silhouetteOf('anchorBolt');
+
+    const { washer } = anchorBoltPartsOf(anchorBolt);
+    const lineAtWasherEnd = verticalLineAt(anchorBolt.strokes, washer.end);
+    assert.ok(lineAtWasherEnd, 'no line on the right of the washer');
+    assert.ok(isAlmostEqual(verticalSpanOf(lineAtWasherEnd), heightOf(anchorBolt.extent)), 'the line does not span exactly the washer');
+  });
+
+  it('should draw the slit of the anchor bolt expansion clip along its axis', () => {
+    const anchorBolt = silhouetteOf('anchorBolt');
+
+    const { clip } = anchorBoltPartsOf(anchorBolt);
+    const slit = anchorBolt.strokes.find((stroke) => isHorizontal(stroke) && isAlmostEqual(stroke[0].y, 0));
+    assert.ok(slit, 'no slit along the axis');
+    assert.ok(isAlmostEqual(extentOf(slit).left, clip.start) && isAlmostEqual(extentOf(slit).right, clip.end), 'the slit does not run along the clip');
+  });
+
+  it('should draw a line across the anchor bolt where the expansion clip meets the cone', () => {
+    const anchorBolt = silhouetteOf('anchorBolt');
+
+    const { shankRadius, clip } = anchorBoltPartsOf(anchorBolt);
+    const lineAtClipEnd = verticalLineAt(anchorBolt.strokes, clip.end);
+    assert.ok(lineAtClipEnd, 'no line between the clip and the cone');
+    assert.ok(isAlmostEqual(verticalSpanOf(lineAtClipEnd), 2 * shankRadius), 'the line does not span exactly the start of the cone');
+  });
+
+  it('should draw a line across the blind rivet where the flange meets the body', () => {
+    const rivet = silhouetteOf('rivet');
+
+    const flange = tallestSpanOf(rivet);
+    const bodyRadius = stepsAlongTopEdge(rivet.points).find(({ x }) => isAlmostEqual(x, flange.end)).narrowerRadius;
+    const lineAtFlangeEnd = verticalLineAt(rivet.strokes, flange.end);
+    assert.ok(lineAtFlangeEnd, 'no line between the flange and the body');
+    assert.ok(isAlmostEqual(verticalSpanOf(lineAtFlangeEnd), 2 * bodyRadius), 'the line does not span exactly the body');
+  });
+
+  it('should draw a line across the blind rivet where the body meets the mandrel head', () => {
+    const rivet = silhouetteOf('rivet');
+
+    const mandrelHeadRadius = halfHeightOf(extentOf(pointsAt(rivet.points, rivet.extent.right)));
+    const lineAtMandrelHead = verticalLineAt(rivet.strokes, bodyEndOf(rivet));
+    assert.ok(lineAtMandrelHead, 'no line between the body and the mandrel head');
+    assert.ok(isAlmostEqual(verticalSpanOf(lineAtMandrelHead), 2 * mandrelHeadRadius), 'the line does not span exactly the mandrel head');
+  });
+
+  it('should draw a washer seen from the front as a round disc with a hollow round hole, without strokes', () => {
+    const { outline, strokes } = drawHardwareIcon('washer');
+
+    const [disc, hole, ...others] = contoursOf(outline);
+    assert.equal(others.length, 0);
+    for (const contour of [disc, hole]) {
+      const extent = extentOf(onCurvePointsOf(contour));
+      assert.ok(contour.some(({ type }) => type === 'C'), 'a contour is not round');
+      assert.ok(isAlmostEqual(lengthOf(extent), heightOf(extent)), 'a contour is not a circle');
+    }
+    assert.notEqual(windingOf(hole), windingOf(disc), 'the hole would be filled');
+    assert.equal(strokes.length, 0);
   });
 
   it('should draw a nut seen from the front as a hexagon with a hollow round hole, without strokes', () => {
@@ -453,7 +666,7 @@ function gapBetweenRailsOf(wallPlug) {
 }
 
 function flangeThicknessOf(molly) {
-  const flange = flangeOf(molly);
+  const flange = tallestSpanOf(molly);
   return flange.end - flange.start;
 }
 
@@ -467,11 +680,18 @@ function coneThreadPitchOf(molly) {
 }
 
 function narrowestGapAroundSpikesOf(molly) {
-  const cornersAtFlangeEnd = pointsAt(molly.corners, flangeOf(molly).end).filter(isAboveAxis);
+  const cornersAtFlangeEnd = pointsAt(molly.corners, tallestSpanOf(molly).end).filter(isAboveAxis);
   return smallestGapBetween(sortedDistinctValues(cornersAtFlangeEnd.map(distanceFromAxisOf)));
 }
 
 describe('thinnestHardwareDetail', () => {
+  it('should give a positive thinnest detail for every hardware type of the catalog', () => {
+    for (const { key } of hardwareTypes) {
+      const thinnestDetail = thinnestHardwareDetail(key);
+      assert.ok(Number.isFinite(thinnestDetail) && thinnestDetail > 0, `no thinnest detail for ${key}`);
+    }
+  });
+
   it('should give the thickness of the head of a nail', () => {
     const nail = silhouetteOf('nail');
 
@@ -516,6 +736,53 @@ describe('thinnestHardwareDetail', () => {
 
     const expected = Math.min(flangeThicknessOf(molly), slotWidthOf(molly), coneThreadPitchOf(molly), narrowestGapAroundSpikesOf(molly));
     assert.ok(isAlmostEqual(thinnestHardwareDetail('mollyAnchor'), expected));
+  });
+
+  it('should give the width of the ring of a washer', () => {
+    const washer = silhouetteOf('washer');
+
+    const ringWidth = extentOf(onCurvePointsOf(washer.holes[0])).left - washer.extent.left;
+    assert.ok(isAlmostEqual(thinnestHardwareDetail('washer'), ringWidth));
+  });
+
+  it('should give the width of the chamfers of a threaded rod', () => {
+    const rod = silhouetteOf('threadedRod');
+
+    const chamferWidth = tallestSpanOf(rod).start - rod.extent.left;
+    assert.ok(isAlmostEqual(thinnestHardwareDetail('threadedRod'), chamferWidth));
+  });
+
+  it('should give the thinnest of the flange, the mandrel, the steps of the edge, the mandrel head rim and length of a blind rivet', () => {
+    const rivet = silhouetteOf('rivet');
+
+    const flange = tallestSpanOf(rivet);
+    const mandrelRadius = Math.max(...rivet.points.filter((point) => isAboveAxis(point) && point.x < flange.start).map(distanceFromAxisOf));
+    const mandrelHeadRadius = halfHeightOf(extentOf(pointsAt(rivet.points, rivet.extent.right)));
+    const mandrelHeadLength = rivet.extent.right - bodyEndOf(rivet);
+    const smallestStep = Math.min(...stepsAlongTopEdge(rivet.points).map(({ stepHeight }) => stepHeight));
+    const expected = Math.min(
+      flange.end - flange.start,
+      2 * mandrelRadius,
+      smallestStep,
+      mandrelHeadRadius - mandrelRadius,
+      mandrelHeadLength,
+    );
+    assert.ok(isAlmostEqual(thinnestHardwareDetail('rivet'), expected));
+  });
+
+  it('should give the thinnest of the chamfer, the washer, the thread pitch, the steps of the edge and the gap between nut face edges and shank of an anchor bolt', () => {
+    const anchorBolt = silhouetteOf('anchorBolt');
+
+    const { shankRadius, washer } = anchorBoltPartsOf(anchorBolt);
+    const shankEdgeStart = extentOf(anchorBolt.points.filter((point) => isAboveAxis(point) && isAlmostEqual(distanceFromAxisOf(point), shankRadius))).left;
+    const chamferWidth = shankEdgeStart - anchorBolt.extent.left;
+    const [firstThread, secondThread] = threadsOfAnchorBolt(anchorBolt);
+    const threadPitch = secondThread[0].x - firstThread[0].x;
+    const smallestStep = Math.min(...stepsAlongTopEdge(anchorBolt.points).map(({ stepHeight }) => stepHeight));
+    const nutFaceEdge = anchorBolt.strokes.find((stroke) => isHorizontal(stroke) && !isAlmostEqual(stroke[0].y, 0));
+    const gapBetweenNutFaceEdgeAndShank = distanceFromAxisOf(nutFaceEdge[0]) - shankRadius;
+    const expected = Math.min(chamferWidth, washer.end - washer.start, threadPitch, smallestStep, gapBetweenNutFaceEdgeAndShank);
+    assert.ok(isAlmostEqual(thinnestHardwareDetail('anchorBolt'), expected));
   });
 });
 
