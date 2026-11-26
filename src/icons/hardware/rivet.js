@@ -1,4 +1,4 @@
-import { atSide, mirroredHorizontalStrokes, mirroredOutline, verticalStroke } from './lyingPiece.js';
+import { atSide, mirroredOutline, verticalStroke } from './lyingPiece.js';
 
 const RIVET = {
   mandrelRadius: 0.07,
@@ -29,16 +29,12 @@ function rivetEdge(side) {
   ];
 }
 
-function mandrelThroughTheBody() {
-  return mirroredHorizontalStrokes({ from: RIVET.flangeEnd, to: RIVET.bodyEnd, distanceFromAxis: RIVET.mandrelRadius });
-}
-
 function partingLines() {
   return [...verticalStroke(RIVET.flangeEnd, RIVET.bodyRadius), ...verticalStroke(RIVET.bodyEnd, RIVET.mandrelHeadRadius)];
 }
 
 function drawRivet() {
-  return { outline: mirroredOutline(rivetEdge), strokes: [...partingLines(), ...mandrelThroughTheBody()] };
+  return { outline: mirroredOutline(rivetEdge), strokes: partingLines() };
 }
 
 export const rivet = {

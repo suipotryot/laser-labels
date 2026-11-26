@@ -50,10 +50,12 @@ function anchorBoltEdge(side) {
   ];
 }
 
-function nutStrokes() {
+function nutAndWasherStrokes() {
   const faceEdges = mirroredHorizontalStrokes({ from: ANCHOR_BOLT.nutStart, to: ANCHOR_BOLT.nutEnd, distanceFromAxis: NUT_FACE_EDGE_DISTANCE_FROM_AXIS });
+  const nutStartLine = verticalStroke(ANCHOR_BOLT.nutStart, ANCHOR_BOLT.nutRadius);
   const nutEndLine = verticalStroke(ANCHOR_BOLT.nutEnd, ANCHOR_BOLT.nutRadius);
-  return [...faceEdges, ...nutEndLine];
+  const washerEndLine = verticalStroke(ANCHOR_BOLT.washerEnd, ANCHOR_BOLT.washerRadius);
+  return [...faceEdges, ...nutStartLine, ...nutEndLine, ...washerEndLine];
 }
 
 function threadsBeforeTheNut() {
@@ -73,7 +75,7 @@ function clipStrokes() {
 function drawAnchorBolt() {
   return {
     outline: mirroredOutline(anchorBoltEdge),
-    strokes: [...nutStrokes(), ...threadsBeforeTheNut(), ...threadsAfterTheWasher(), ...clipStrokes()],
+    strokes: [...nutAndWasherStrokes(), ...threadsBeforeTheNut(), ...threadsAfterTheWasher(), ...clipStrokes()],
   };
 }
 

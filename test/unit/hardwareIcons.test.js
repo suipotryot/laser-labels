@@ -130,6 +130,12 @@ function anchorBoltPartsOf(anchorBolt) {
   };
 }
 
+function bodyEndOf(rivet) {
+  const flange = tallestSpanOf(rivet);
+  const bodyRadius = stepsAlongTopEdge(rivet.points).find(({ x }) => isAlmostEqual(x, flange.end)).narrowerRadius;
+  return extentOf(rivet.points.filter((point) => isAboveAxis(point) && isAlmostEqual(distanceFromAxisOf(point), bodyRadius))).right;
+}
+
 function threadsOfAnchorBolt(anchorBolt) {
   const { shankRadius, nut } = anchorBoltPartsOf(anchorBolt);
   const isShorterThanTheNut = (stroke) => verticalSpanOf(stroke) < 2 * nut.radius;
@@ -495,20 +501,17 @@ describe('drawHardwareIcon', () => {
     const flange = tallestSpanOf(rivet);
     const mandrelRadius = Math.max(...rivet.points.filter((point) => isAboveAxis(point) && point.x < flange.start).map(distanceFromAxisOf));
     const bodyRadius = stepsAlongTopEdge(rivet.points).find(({ x }) => isAlmostEqual(x, flange.end)).narrowerRadius;
-    const bodyEnd = extentOf(rivet.points.filter((point) => isAboveAxis(point) && isAlmostEqual(distanceFromAxisOf(point), bodyRadius))).right;
     assert.ok(flange.start > fractionAlong(rivet.extent, 1 / 4), 'the mandrel is not on the left');
     assert.ok(mandrelRadius < heightOf(rivet.extent) / 4, 'the mandrel is not thin');
     assert.ok(bodyRadius > mandrelRadius && bodyRadius < halfHeightOf(rivet.extent), 'the body is not between the mandrel and the flange');
-    assert.ok(bodyEnd > fractionAlong(rivet.extent, 9 / 10), 'the body does not reach near the end');
+    assert.ok(bodyEndOf(rivet) > fractionAlong(rivet.extent, 9 / 10), 'the body does not reach near the end');
     assert.ok(hasFlatEnd(rivet), 'the end is not flat');
   });
 
-  it('should draw the mandrel of the blind rivet through its body', () => {
+  it('should not draw any horizontal line inside the body of the blind rivet', () => {
     const rivet = silhouetteOf('rivet');
 
-    const flange = tallestSpanOf(rivet);
-    const mandrelLines = rivet.strokes.filter((stroke) => isHorizontal(stroke) && stroke.every(({ x }) => x >= flange.end));
-    assert.equal(mandrelLines.length, 2, 'the mandrel does not go through the body');
+    assert.equal(rivet.strokes.filter(isHorizontal).length, 0);
   });
 
   it('should draw an anchor bolt with a nut and then a washer, wider than the nut, near its flat left end', () => {
@@ -563,6 +566,24 @@ describe('drawHardwareIcon', () => {
     assert.ok(isAlmostEqual(verticalSpanOf(lineAtWasherStart), 2 * nut.radius), 'the line does not span exactly the nut');
   });
 
+  it('should draw a line across the anchor bolt on the left of the nut', () => {
+    const anchorBolt = silhouetteOf('anchorBolt');
+
+    const { nut } = anchorBoltPartsOf(anchorBolt);
+    const lineAtNutStart = verticalLineAt(anchorBolt.strokes, nut.start);
+    assert.ok(lineAtNutStart, 'no line on the left of the nut');
+    assert.ok(isAlmostEqual(verticalSpanOf(lineAtNutStart), 2 * nut.radius), 'the line does not span exactly the nut');
+  });
+
+  it('should draw a line across the anchor bolt on the right of the washer', () => {
+    const anchorBolt = silhouetteOf('anchorBolt');
+
+    const { washer } = anchorBoltPartsOf(anchorBolt);
+    const lineAtWasherEnd = verticalLineAt(anchorBolt.strokes, washer.end);
+    assert.ok(lineAtWasherEnd, 'no line on the right of the washer');
+    assert.ok(isAlmostEqual(verticalSpanOf(lineAtWasherEnd), heightOf(anchorBolt.extent)), 'the line does not span exactly the washer');
+  });
+
   it('should draw the slit of the anchor bolt expansion clip along its axis', () => {
     const anchorBolt = silhouetteOf('anchorBolt');
 
@@ -591,13 +612,12 @@ describe('drawHardwareIcon', () => {
     assert.ok(isAlmostEqual(verticalSpanOf(lineAtFlangeEnd), 2 * bodyRadius), 'the line does not span exactly the body');
   });
 
-  it('should draw a line across the blind rivet where the body meets the mandrel head, closing the mandrel lines', () => {
+  it('should draw a line across the blind rivet where the body meets the mandrel head', () => {
     const rivet = silhouetteOf('rivet');
 
     const mandrelHeadRadius = halfHeightOf(extentOf(pointsAt(rivet.points, rivet.extent.right)));
-    const mandrelLinesEnd = extentOf(rivet.strokes.filter(isHorizontal).flat()).right;
-    const lineAtMandrelHead = verticalLineAt(rivet.strokes, mandrelLinesEnd);
-    assert.ok(lineAtMandrelHead, 'the mandrel lines end in the void');
+    const lineAtMandrelHead = verticalLineAt(rivet.strokes, bodyEndOf(rivet));
+    assert.ok(lineAtMandrelHead, 'no line between the body and the mandrel head');
     assert.ok(isAlmostEqual(verticalSpanOf(lineAtMandrelHead), 2 * mandrelHeadRadius), 'the line does not span exactly the mandrel head');
   });
 
@@ -736,10 +756,9 @@ describe('thinnestHardwareDetail', () => {
     const rivet = silhouetteOf('rivet');
 
     const flange = tallestSpanOf(rivet);
-    const mandrel = rivet.strokes.find(isHorizontal);
-    const mandrelRadius = distanceFromAxisOf(mandrel[0]);
+    const mandrelRadius = Math.max(...rivet.points.filter((point) => isAboveAxis(point) && point.x < flange.start).map(distanceFromAxisOf));
     const mandrelHeadRadius = halfHeightOf(extentOf(pointsAt(rivet.points, rivet.extent.right)));
-    const mandrelHeadLength = rivet.extent.right - extentOf(mandrel).right;
+    const mandrelHeadLength = rivet.extent.right - bodyEndOf(rivet);
     const smallestStep = Math.min(...stepsAlongTopEdge(rivet.points).map(({ stepHeight }) => stepHeight));
     const expected = Math.min(
       flange.end - flange.start,
