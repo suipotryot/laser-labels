@@ -8,6 +8,7 @@ export const hardwareTypes = [
   { key: 'wallPlug', name: 'Cheville', hasDrive: false },
   { key: 'mollyAnchor', name: 'Cheville Molly', hasDrive: false },
   { key: 'washer', name: 'Rondelle', hasDrive: false },
+  { key: 'threadedRod', name: 'Tige filetée', hasDrive: false },
 ];
 
 export function findHardwareType(key) {

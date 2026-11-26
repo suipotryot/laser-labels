@@ -422,6 +422,25 @@ describe('drawHardwareIcon', () => {
     assert.ok(verticalLineAt(molly.strokes, flange.end), 'no line between the flange and the sleeve');
   });
 
+  it('should draw a threaded rod without head, with flat ends on both sides', () => {
+    const rod = silhouetteOf('threadedRod');
+
+    assert.ok(hasFlatEnd(rod), 'the right end is not flat');
+    assert.equal(pointsAt(rod.points, rod.extent.left).length, 2, 'the left end is not flat');
+    const rodRadius = -rod.extent.top;
+    const thickestPoints = rod.points.filter(({ y }) => isAlmostEqual(-y, rodRadius));
+    assert.ok(lengthOf(extentOf(thickestPoints)) > 0.9 * lengthOf(rod.extent), 'the rod does not keep its thickness along its length');
+  });
+
+  it('should draw straight threads crossing the edges along the whole threaded rod', () => {
+    const rod = silhouetteOf('threadedRod');
+
+    const threads = rod.strokes.filter(isVertical);
+    assert.ok(threads.every((thread) => crossesEdges(thread, -rod.extent.top)), 'threads do not cross the edges');
+    assert.ok(Math.min(...threads.map(([start]) => start.x)) < rod.extent.left + lengthOf(rod.extent) / 10, 'threads do not start near the left end');
+    assert.ok(Math.max(...threads.map(([start]) => start.x)) > rod.extent.right - lengthOf(rod.extent) / 10, 'threads do not reach the right end');
+  });
+
   it('should draw a washer seen from the front as a round disc with a hollow round hole, without strokes', () => {
     const { outline, strokes } = drawHardwareIcon('washer');
 

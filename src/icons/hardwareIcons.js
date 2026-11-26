@@ -8,8 +8,9 @@ import { eyeScrew } from './hardware/eyeScrew.js';
 import { wallPlug } from './hardware/wallPlug.js';
 import { mollyAnchor } from './hardware/mollyAnchor.js';
 import { washer } from './hardware/washer.js';
+import { threadedRod } from './hardware/threadedRod.js';
 
-const HARDWARE_ICONS = { screw, nail, bolt, nut, hook, eyeScrew, wallPlug, mollyAnchor, washer };
+const HARDWARE_ICONS = { screw, nail, bolt, nut, hook, eyeScrew, wallPlug, mollyAnchor, washer, threadedRod };
 
 function hardwareIconOf(hardwareTypeKey) {
   if (!Object.hasOwn(HARDWARE_ICONS, hardwareTypeKey)) {
