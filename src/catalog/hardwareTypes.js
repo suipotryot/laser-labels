@@ -10,6 +10,7 @@ export const hardwareTypes = [
   { key: 'washer', name: 'Rondelle', hasDrive: false },
   { key: 'threadedRod', name: 'Tige filetée', hasDrive: false },
   { key: 'rivet', name: 'Rivet', hasDrive: false },
+  { key: 'anchorBolt', name: "Goujon d'ancrage", hasDrive: false },
 ];
 
 export function findHardwareType(key) {

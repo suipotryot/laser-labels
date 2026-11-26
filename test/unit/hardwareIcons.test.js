@@ -92,6 +92,15 @@ function firstStepAlongTopEdge(points) {
   return stepsAlongTopEdge(points)[0];
 }
 
+function anchorBoltPartsOf({ points, extent }) {
+  const studRadius = firstStepAlongTopEdge(points).radiusAfter;
+  const washerPoints = points.filter(({ y }) => isAlmostEqual(y, extent.top));
+  const washerStart = Math.min(...washerPoints.map(({ x }) => x));
+  const washerEnd = Math.max(...washerPoints.map(({ x }) => x));
+  const nutPoints = points.filter(({ x, y }) => (x < washerStart || isAlmostEqual(x, washerStart)) && -y > 1.5 * studRadius && -y < -extent.top);
+  return { studRadius, washerStart, washerEnd, nutPoints };
+}
+
 function isStraight(stroke) {
   return stroke.length === 2;
 }
@@ -458,6 +467,38 @@ describe('drawHardwareIcon', () => {
     const flangeEnd = Math.max(...rivet.points.filter(({ y }) => isAlmostEqual(y, rivet.extent.top)).map(({ x }) => x));
     const mandrelLines = rivet.strokes.filter((stroke) => isHorizontal(stroke) && stroke.every(({ x }) => x >= flangeEnd));
     assert.equal(mandrelLines.length, 2, 'the mandrel does not go through the body');
+  });
+
+  it('should draw an anchor bolt with a nut and then a taller washer near its flat left end', () => {
+    const anchorBolt = silhouetteOf('anchorBolt');
+
+    const { washerEnd, nutPoints } = anchorBoltPartsOf(anchorBolt);
+    assert.ok(washerEnd < anchorBolt.extent.left + lengthOf(anchorBolt.extent) / 3, 'the washer is not near the left end');
+    assert.ok(nutPoints.length >= 2, 'no nut before the washer');
+    assert.equal(pointsAt(anchorBolt.points, anchorBolt.extent.left).length, 2, 'the stud does not end flat on the left');
+  });
+
+  it('should draw an expansion clip and a cone widening to a flat end on the right of the anchor bolt', () => {
+    const anchorBolt = silhouetteOf('anchorBolt');
+
+    const { studRadius } = anchorBoltPartsOf(anchorBolt);
+    const lastThird = anchorBolt.extent.right - lengthOf(anchorBolt.extent) / 3;
+    const clipPoints = anchorBolt.points.filter(({ x, y }) => x > lastThird && x < anchorBolt.extent.right && -y > studRadius * 1.1);
+    assert.ok(clipPoints.length >= 2, 'no expansion clip');
+    assert.ok(hasFlatEnd(anchorBolt), 'the end is not flat');
+    const endRadius = -Math.min(...pointsAt(anchorBolt.points, anchorBolt.extent.right).map(({ y }) => y));
+    assert.ok(endRadius > studRadius, 'the cone does not widen');
+  });
+
+  it('should draw threads on the anchor bolt stud on both sides of the nut and washer, not under them', () => {
+    const anchorBolt = silhouetteOf('anchorBolt');
+
+    const { studRadius, nutPoints, washerEnd } = anchorBoltPartsOf(anchorBolt);
+    const nutStart = Math.min(...nutPoints.map(({ x }) => x));
+    const threads = anchorBolt.strokes.filter((stroke) => isVertical(stroke) && crossesEdges(stroke, studRadius) && verticalSpanOf(stroke) < 3 * studRadius);
+    assert.ok(threads.some(([start]) => start.x < nutStart), 'no threads left of the nut');
+    assert.ok(threads.some(([start]) => start.x > washerEnd), 'no threads right of the washer');
+    assert.ok(!threads.some(([start]) => start.x > nutStart && start.x < washerEnd), 'threads run under the nut or the washer');
   });
 
   it('should draw a washer seen from the front as a round disc with a hollow round hole, without strokes', () => {
