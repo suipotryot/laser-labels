@@ -24,10 +24,24 @@ describe('readStoredLanguage', () => {
     assert.equal(readStoredLanguage(storage), 'en');
   });
 
-  it('should refuse a stored language that is not supported', () => {
+  it('should fall back to French and warn when the stored language is not supported', () => {
     const storage = createStorage({ 'laser-labels.language': 'de' });
+    const warnings = [];
 
-    assert.throws(() => readStoredLanguage(storage), /Unknown language: de/);
+    assert.equal(readStoredLanguage(storage, (message) => warnings.push(message)), 'fr');
+    assert.match(warnings[0], /Unknown language: de/);
+  });
+
+  it('should fall back to French and warn when the storage cannot be read', () => {
+    const blockedStorage = {
+      getItem: () => {
+        throw new Error('Storage is blocked');
+      },
+    };
+    const warnings = [];
+
+    assert.equal(readStoredLanguage(blockedStorage, (message) => warnings.push(message)), 'fr');
+    assert.match(warnings[0], /Storage is blocked/);
   });
 });
 

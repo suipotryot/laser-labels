@@ -471,6 +471,17 @@ test.describe('language select', () => {
     await expect(page.getByLabel('Outdoor')).toBeChecked();
   });
 
+  test('should start in French and warn when the stored language is not supported', async ({ page }) => {
+    const warnings = [];
+    page.on('console', (message) => message.type() === 'warning' && warnings.push(message.text()));
+    await page.evaluate(() => localStorage.setItem('laser-labels.language', 'de'));
+
+    await page.reload();
+
+    await expect(page.getByLabel('Largeur (mm)')).toBeVisible();
+    expect(warnings.join(' ')).toContain('Unknown language: de');
+  });
+
   test('should remember the chosen language after a reload', async ({ page }) => {
     await switchToEnglish(page);
 
