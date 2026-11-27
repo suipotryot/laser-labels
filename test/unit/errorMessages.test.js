@@ -23,7 +23,7 @@ describe('describeLabelSpecError', () => {
     assert.equal(describeLabelSpecError('fr', error), 'Ces caractères ne peuvent pas être gravés : ⌀ →');
   });
 
-  it('should refuse to describe an error it has no message for', () => {
+  it('should refuse to describe an error it has no text for', () => {
     const error = new LabelSpecError('width', 'tooFunny');
 
     assert.throws(() => describeLabelSpecError('fr', error), /No text for error\.width\.tooFunny in fr/);

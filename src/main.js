@@ -13,7 +13,7 @@ import { readStoredLanguage, storeLanguage } from './i18n/storedLanguage.js';
 
 let language = readStoredLanguage(localStorage);
 
-function say(key, parameters) {
+function textFor(key, parameters) {
   return translate(language, key, parameters);
 }
 
@@ -36,7 +36,7 @@ const downloadButton = document.getElementById('download');
 function translateStaticTexts() {
   document.documentElement.lang = language;
   for (const element of document.querySelectorAll('[data-i18n]')) {
-    element.textContent = say(element.dataset.i18n);
+    element.textContent = textFor(element.dataset.i18n);
   }
 }
 
@@ -45,18 +45,18 @@ function populateLanguages() {
   languageSelect.value = language;
 }
 
-function keepingChosenOption(select, populate) {
+function repopulateKeepingChoice(select, populate) {
   const chosenIndex = Math.max(select.selectedIndex, 0);
   populate();
   select.selectedIndex = chosenIndex;
 }
 
-function toOption(prefix) {
-  return ({ key }) => new Option(say(`${prefix}.${key}`), key);
+function toTranslatedOption(prefix) {
+  return ({ key }) => new Option(textFor(`${prefix}.${key}`), key);
 }
 
 function populateHardwareTypes() {
-  hardwareTypeSelect.replaceChildren(...hardwareTypes.map(toOption('hardware')));
+  hardwareTypeSelect.replaceChildren(...hardwareTypes.map(toTranslatedOption('hardware')));
 }
 
 function toUsageCheckbox({ key }) {
@@ -64,7 +64,7 @@ function toUsageCheckbox({ key }) {
   checkbox.type = 'checkbox';
   checkbox.value = key;
   const label = document.createElement('label');
-  label.append(checkbox, ` ${say(`usage.${key}`)}`);
+  label.append(checkbox, ` ${textFor(`usage.${key}`)}`);
   return label;
 }
 
@@ -82,8 +82,8 @@ function populateUsages() {
 }
 
 function populateDriveTypes() {
-  const noDrive = new Option(say('drive.none'), NO_DRIVE);
-  driveTypeSelect.replaceChildren(noDrive, ...driveTypes.map(toOption('drive')));
+  const noDrive = new Option(textFor('drive.none'), NO_DRIVE);
+  driveTypeSelect.replaceChildren(noDrive, ...driveTypes.map(toTranslatedOption('drive')));
 }
 
 function sizesOfChosenDriveType() {
@@ -123,6 +123,7 @@ function readFormFields() {
 }
 
 let engravingFont = null;
+let hasFontLoadingFailed = false;
 let previewedLabel = null;
 
 function rememberPreviewedLabel(label) {
@@ -147,7 +148,7 @@ function showMessages({ error = '', status = '' }) {
 }
 
 function smallDetailsWarningFor(spec) {
-  return hasDetailsTooSmallToEngrave(spec, engravingFont) ? say('notice.smallDetails') : '';
+  return hasDetailsTooSmallToEngrave(spec, engravingFont) ? textFor('notice.smallDetails') : '';
 }
 
 function previewLabel(spec) {
@@ -170,7 +171,7 @@ function explainInvalidField(error) {
 
 function explainUnexpectedError(error) {
   clearPreview();
-  showMessages({ error: say('notice.unexpectedError') });
+  showMessages({ error: textFor('notice.unexpectedError') });
   throw error;
 }
 
@@ -196,19 +197,17 @@ function startPreviewingWith(font) {
   refreshPreview();
 }
 
-let fontLoadingFailed = false;
-
 function explainFontLoadingFailure(error) {
-  fontLoadingFailed = true;
+  hasFontLoadingFailed = true;
   showFontLoadingState();
   throw error;
 }
 
 function showFontLoadingState() {
-  if (fontLoadingFailed) {
-    showMessages({ error: say('notice.fontLoadingFailure') });
+  if (hasFontLoadingFailed) {
+    showMessages({ error: textFor('notice.fontLoadingFailure') });
   } else {
-    showMessages({ status: say('notice.fontLoading') });
+    showMessages({ status: textFor('notice.fontLoading') });
   }
 }
 
@@ -221,17 +220,17 @@ function refreshMessagesAndPreview() {
 }
 
 function populateChoices() {
-  keepingChosenOption(hardwareTypeSelect, populateHardwareTypes);
+  repopulateKeepingChoice(hardwareTypeSelect, populateHardwareTypes);
   populateUsages();
-  keepingChosenOption(driveTypeSelect, populateDriveTypes);
+  repopulateKeepingChoice(driveTypeSelect, populateDriveTypes);
 }
 
 function changeLanguage() {
   language = languageSelect.value;
-  storeLanguage(localStorage, language);
   translateStaticTexts();
   populateChoices();
   refreshMessagesAndPreview();
+  storeLanguage(localStorage, language);
 }
 
 populateLanguages();

@@ -18,7 +18,7 @@ function findDictionary(language) {
   return dictionaries[checkLanguageIsSupported(language)];
 }
 
-function writeParameter(value) {
+function toParameterText(value) {
   return Array.isArray(value) ? value.join(' ') : String(value);
 }
 
@@ -27,7 +27,7 @@ function insertParameters(text, parameters) {
     if (!(name in parameters)) {
       throw new Error(`Missing parameter ${name}`);
     }
-    return writeParameter(parameters[name]);
+    return toParameterText(parameters[name]);
   });
 }
 

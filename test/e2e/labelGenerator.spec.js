@@ -4,8 +4,8 @@ import { hardwareTypes } from '../../src/catalog/hardwareTypes.js';
 import { usageTypes } from '../../src/catalog/usageTypes.js';
 import { translate } from '../../src/i18n/translate.js';
 
-const FONT_LOADING_FAILURE_NOTICE = "La police de gravure n'a pas pu être chargée : rechargez la page.";
-const SMALL_DETAILS_NOTICE = "Certains détails sont très petits : ils risquent d'être illisibles une fois gravés.";
+const FONT_LOADING_FAILURE_NOTICE = translate('fr', 'notice.fontLoadingFailure');
+const SMALL_DETAILS_NOTICE = translate('fr', 'notice.smallDetails');
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/');
@@ -418,7 +418,7 @@ test.describe('language select', () => {
     await languageSelectOf(page).selectOption('en');
   }
 
-  test('should speak French until another language is chosen', async ({ page }) => {
+  test('should show the form in French by default', async ({ page }) => {
     await expect(page.locator('html')).toHaveAttribute('lang', 'fr');
     await expect(page.getByLabel('Largeur (mm)')).toBeVisible();
   });
@@ -441,7 +441,7 @@ test.describe('language select', () => {
     await expect(page.getByRole('alert')).toHaveText('The width must be a positive number (in mm).');
   });
 
-  test('should explain a standing error in the new language as soon as it is chosen', async ({ page }) => {
+  test('should explain the current error in the new language once it is chosen', async ({ page }) => {
     await page.getByLabel('Largeur (mm)').fill('abc');
 
     await switchToEnglish(page);

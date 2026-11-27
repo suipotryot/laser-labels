@@ -25,8 +25,4 @@ describe('translate', () => {
   it('should refuse an unknown language', () => {
     assert.throws(() => translate('de', 'hardware.nut'), /Unknown language: de/);
   });
-
-  it('should insert the parameters into the text', () => {
-    assert.equal(translate('en', 'error.dimensions.unengravableCharacters', { characters: ['⌀', '→'] }), 'These characters cannot be engraved: ⌀ →');
-  });
 });
