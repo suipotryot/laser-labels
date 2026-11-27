@@ -20,6 +20,10 @@ npm run build      # produit dist/index.html
 npm run deploy     # build + copie dans ../suipotryot.github.io/laser-labels
 ```
 
+## Déploiement
+
+`npm run deploy` construit le projet puis remplace le dossier `laser-labels/` du clone voisin `../suipotryot.github.io` par le contenu de `dist/` (échec explicite si le clone ou le build est absent). Il reste ensuite à committer et pousser dans le dépôt du hub : GitHub Pages sert sa branche `main` telle quelle.
+
 ## SVG produit
 
 - Dimensions en millimètres (`width="60mm"`, `viewBox` en mm) : la taille réelle est conservée à l'import dans LightBurn.
