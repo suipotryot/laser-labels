@@ -125,11 +125,10 @@ function readFormFields() {
   };
 }
 
-const COPY_CONFIRMATION_DURATION_MS = 2000;
-
 let engravingFont = null;
 let hasFontLoadingFailed = false;
 let previewedLabel = null;
+let copyConfirmationTimer = null;
 
 function buildImageUrl(formFields) {
   const url = new URL(location.href);
@@ -145,6 +144,11 @@ function hideImageUrl() {
   imageUrlInput.value = '';
 }
 
+function showUsualCopyUrlText() {
+  clearTimeout(copyConfirmationTimer);
+  copyUrlButton.textContent = textFor('ui.copyUrl');
+}
+
 function rememberPreviewedLabel(label) {
   previewedLabel = label;
   downloadButton.disabled = false;
@@ -155,6 +159,7 @@ function forgetPreviewedLabel() {
   previewedLabel = null;
   downloadButton.disabled = true;
   copyUrlButton.disabled = true;
+  showUsualCopyUrlText();
   hideImageUrl();
 }
 
@@ -215,15 +220,25 @@ function downloadPreviewedLabel() {
   downloadSvg(previewedLabel.svg, previewedLabel.fileName);
 }
 
+const COPY_CONFIRMATION_DURATION_MS = 2000;
+
 function showCopyConfirmation() {
+  clearTimeout(copyConfirmationTimer);
   copyUrlButton.textContent = textFor('ui.urlCopied');
-  setTimeout(() => {
-    copyUrlButton.textContent = textFor('ui.copyUrl');
-  }, COPY_CONFIRMATION_DURATION_MS);
+  copyConfirmationTimer = setTimeout(showUsualCopyUrlText, COPY_CONFIRMATION_DURATION_MS);
+}
+
+function explainCopyFailure(error) {
+  showMessages({ error: textFor('notice.copyFailure') });
+  throw error;
 }
 
 async function copyImageUrl() {
-  await navigator.clipboard.writeText(imageUrlInput.value);
+  try {
+    await navigator.clipboard.writeText(imageUrlInput.value);
+  } catch (error) {
+    explainCopyFailure(error);
+  }
   showCopyConfirmation();
 }
 

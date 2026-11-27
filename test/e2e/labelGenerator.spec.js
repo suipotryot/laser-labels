@@ -449,6 +449,35 @@ test.describe('copy URL button', () => {
     await copyUrlButtonOf(page).click();
 
     expect((await pageErrorPromise).message).toBe('clipboard refused');
+    await expect(page.locator('#error-message')).toHaveText("Impossible de copier l'URL.");
+  });
+
+  test('should keep confirming for the full duration after a second click', async ({ page }) => {
+    await page.evaluate(() => {
+      navigator.clipboard.writeText = () => Promise.resolve();
+    });
+    await page.clock.install({ time: 0 });
+    await page.clock.pauseAt(1000);
+    await copyUrlButtonOf(page).click();
+    await page.clock.runFor(1500);
+    await page.getByRole('button', { name: 'URL copiée !' }).click();
+
+    await page.clock.runFor(1000);
+
+    await expect(page.getByRole('button', { name: 'URL copiée !' })).toBeVisible();
+  });
+
+  test('should show its usual text again once a field becomes invalid', async ({ page }) => {
+    await page.evaluate(() => {
+      navigator.clipboard.writeText = () => Promise.resolve();
+    });
+    await page.clock.install({ time: 0 });
+    await page.clock.pauseAt(1000);
+    await copyUrlButtonOf(page).click();
+
+    await page.getByLabel('Largeur (mm)').fill('abc');
+
+    await expect(copyUrlButtonOf(page)).toBeVisible();
   });
 });
 

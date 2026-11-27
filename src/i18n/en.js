@@ -17,6 +17,7 @@ export const en = {
   'ui.imageUrl': 'Image URL',
   'ui.language': 'Language',
 
+  'notice.copyFailure': 'Unable to copy the URL.',
   'notice.smallDetails': 'Some details are very small: they may be unreadable once engraved.',
   'notice.fontLoadingFailure': 'The engraving font could not be loaded: reload the page.',
   'notice.fontLoading': 'Loading the engraving font…',

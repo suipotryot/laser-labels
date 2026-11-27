@@ -17,6 +17,7 @@ export const fr = {
   'ui.imageUrl': "URL de l'image",
   'ui.language': 'Langue',
 
+  'notice.copyFailure': "Impossible de copier l'URL.",
   'notice.smallDetails': "Certains détails sont très petits : ils risquent d'être illisibles une fois gravés.",
   'notice.fontLoadingFailure': "La police de gravure n'a pas pu être chargée : rechargez la page.",
   'notice.fontLoading': 'Chargement de la police de gravure…',
