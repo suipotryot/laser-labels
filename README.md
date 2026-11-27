@@ -35,6 +35,17 @@ npm run deploy     # build + copie dans ../suipotryot.github.io/laser-labels
 
 L'interface est disponible en français (par défaut) et en anglais. Le choix est mémorisé dans le navigateur (`localStorage`) et détermine aussi le nom du fichier téléchargé. Les textes sont dans `src/i18n/fr.js` et `src/i18n/en.js` : une clé ajoutée dans l'une doit l'être dans l'autre (un test le vérifie). Le SVG ne contient que la dimension saisie et la taille d'empreinte, qui ne sont pas traduites.
 
+## Mode image (intégration dans une autre application)
+
+L'URL affichée sous l'aperçu (champ « URL de l'image ») génère la même étiquette sans interface : `…/laser-labels/?mode=image&width=60&height=20&hardwareType=screw&driveType=pozidriv&driveSize=PZ2&dimensions=3%2C5x50&hasFrame=false&usages=metal,outdoor`.
+
+Une application qui l'embarque dans un `iframe` reçoit un `postMessage` :
+
+- `{ type: 'engraving-image', svg, widthMm, heightMm }` quand l'étiquette est valide ;
+- `{ type: 'engraving-image-error', field, reason }` quand un champ est refusé (`reason: 'missing'` si `width`, `height` ou `hardwareType` manque).
+
+Tout autre générateur d'images respectant ce contrat peut être utilisé de la même façon.
+
 ## Police
 
 Le texte est gravé en [Barlow Semi Condensed](https://github.com/jpt/barlow) SemiBold, © 2017 The Barlow Project Authors, sous licence SIL Open Font License 1.1 (voir [src/text/fonts/OFL.txt](src/text/fonts/OFL.txt)).

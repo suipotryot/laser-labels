@@ -409,6 +409,37 @@ test.describe('download button', () => {
   });
 });
 
+test.describe('image URL field', () => {
+  function imageUrlOf(page) {
+    return page.getByLabel("URL de l'image");
+  }
+
+  test('should give the URL that generates the drawn label', async ({ page }) => {
+    await fillScrewLabel(page);
+
+    const imageUrl = new URL(await imageUrlOf(page).inputValue());
+
+    expect(imageUrl.origin).toBe(new URL(page.url()).origin);
+    expect(Object.fromEntries(imageUrl.searchParams)).toMatchObject({
+      mode: 'image',
+      width: '60',
+      height: '20',
+      hardwareType: 'screw',
+      driveType: 'pozidriv',
+      driveSize: 'PZ2',
+      dimensions: '3,5x50',
+    });
+  });
+
+  test('should be emptied while a field is invalid', async ({ page }) => {
+    await fillScrewLabel(page);
+
+    await page.getByLabel('Largeur (mm)').fill('abc');
+
+    await expect(imageUrlOf(page)).toHaveValue('');
+  });
+});
+
 test.describe('language select', () => {
   function languageSelectOf(page) {
     return page.locator('#language');

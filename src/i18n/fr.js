@@ -12,6 +12,7 @@ export const fr = {
   'ui.driveType': "Type d'empreinte",
   'ui.driveSize': "Taille d'empreinte",
   'ui.download': 'Télécharger',
+  'ui.imageUrl': "URL de l'image",
   'ui.language': 'Langue',
 
   'notice.smallDetails': "Certains détails sont très petits : ils risquent d'être illisibles une fois gravés.",
