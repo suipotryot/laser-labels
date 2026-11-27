@@ -42,8 +42,7 @@ L'URL affichée sous l'aperçu (champ « URL de l'image ») génère la même é
 Une application qui l'embarque dans un `iframe` reçoit un `postMessage` :
 
 - `{ type: 'engraving-image', svg, widthMm, heightMm }` quand l'étiquette est valide ;
-- `{ type: 'engraving-image-error', field, reason }` quand un champ est refusé (`reason: 'missing'` si `width`, `height` ou `hardwareType` manque).
-
+- `{ type: 'engraving-image-error', field, reason }` quand un champ est refusé (`reason: 'missing'` si `width`, `height` ou `hardwareType` manque) ;
 - `{ type: 'engraving-image-error', field: null, reason: 'internal' }` quand la génération échoue (police introuvable, erreur inattendue) ;
 - pour `unengravableCharacters`, la réponse porte aussi `characters`.
 
