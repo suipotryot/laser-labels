@@ -39,8 +39,10 @@ function isHorizontal([start, end]) {
   return isAlmostEqual(start.y, end.y);
 }
 
-function sideOf(value) {
-  return isAlmostEqual(value, 0) ? 0 : Math.sign(value);
+function treadRowsOf({ holes }) {
+  const heightOfHole = (hole) => centerOf(sampledPointsOf(hole)).y;
+  const rowHeights = [...new Set(holes.map((hole) => Math.round(heightOfHole(hole) * 1e6)))].sort((first, second) => first - second);
+  return rowHeights.map((rowHeight) => holes.filter((hole) => Math.round(heightOfHole(hole) * 1e6) === rowHeight));
 }
 
 function smallestDistanceBetween(firstHole, secondHole) {
@@ -91,36 +93,50 @@ describe('drawUsageIcon', () => {
     assert.throws(() => drawUsageIcon('constructor'), /No icon for usage: constructor/);
   });
 
-  it('should draw the metal as a square plate with five hollow ellipses, no stroke', () => {
+  it('should draw the metal as a square plate with thirteen hollow ellipses, no stroke', () => {
     const plate = silhouetteOf('metal');
 
     assert.equal(cornersOf(plate.body).length, 4);
     assert.ok(isAlmostEqual(lengthOf(plate.extent), heightOf(plate.extent)), 'the plate is not square');
-    assert.equal(plate.holes.length, 5);
+    assert.equal(plate.holes.length, 13);
     assert.equal(plate.strokes.length, 0);
   });
 
-  it('should spread the ellipses of the metal plate on its four quarters and its middle, well inside the plate', () => {
+  it('should keep every ellipse of the metal plate well inside the plate', () => {
     const { holes } = silhouetteOf('metal');
 
-    const centers = holes.map((hole) => centerOf(sampledPointsOf(hole)));
-    assert.deepEqual(centers.map(({ x }) => sideOf(x)).sort(), [-1, -1, 0, 1, 1]);
-    assert.deepEqual(centers.map(({ y }) => sideOf(y)).sort(), [-1, -1, 0, 1, 1]);
     for (const point of holes.flatMap(sampledPointsOf)) {
       assert.ok(Math.abs(point.x) < UNIT_HALF_SIZE && Math.abs(point.y) < UNIT_HALF_SIZE, 'an ellipse leaves the plate');
     }
   });
 
-  it('should lean the corner ellipses of the metal plate one way then the other, like a tread plate', () => {
+  it('should lay the ellipses of the metal plate in five evenly spaced rows of three and two ellipses', () => {
+    const rows = treadRowsOf(silhouetteOf('metal'));
+
+    assert.deepEqual(rows.map((row) => row.length), [3, 2, 3, 2, 3]);
+    const rowHeights = rows.map(([hole]) => centerOf(sampledPointsOf(hole)).y);
+    assert.ok(isAlmostEqual(rowHeights[2], 0), 'the middle row is not on the middle of the plate');
+    assert.ok(rowHeights.slice(1).every((height, index) => isAlmostEqual(height - rowHeights[index], rowHeights[1] - rowHeights[0])), 'the rows are not evenly spaced');
+  });
+
+  it('should lean the ellipses of each row of the metal plate the same way, and the other way in the next row, like a tread plate', () => {
+    const rows = treadRowsOf(silhouetteOf('metal'));
+
+    const leansOfRows = rows.map((row) => new Set(row.map(leanOf)));
+    assert.ok(leansOfRows.every((leans) => leans.size === 1), 'a row has ellipses leaning both ways');
+    const leans = leansOfRows.map(([lean]) => lean);
+    assert.ok(leans.slice(1).every((lean, index) => lean !== leans[index]), 'two neighbour rows lean the same way');
+  });
+
+  it('should stretch the ellipses of the metal plate to at least four times their width', () => {
     const { holes } = silhouetteOf('metal');
 
-    const leanAt = (sideX, sideY) => leanOf(holes.find((hole) => {
-      const center = centerOf(sampledPointsOf(hole));
-      return sideOf(center.x) === sideX && sideOf(center.y) === sideY;
-    }));
-    assert.notEqual(leanAt(-1, -1), leanAt(1, -1), 'two neighbours lean the same way');
-    assert.notEqual(leanAt(-1, -1), leanAt(-1, 1), 'two neighbours lean the same way');
-    assert.equal(leanAt(-1, -1), leanAt(1, 1));
+    for (const hole of holes) {
+      const points = sampledPointsOf(hole, DENSE_SAMPLING);
+      const center = centerOf(points);
+      const distances = points.map((point) => distanceBetween(point, center));
+      assert.ok(Math.max(...distances) >= 4 * Math.min(...distances), 'an ellipse is not stretched enough');
+    }
   });
 
   it('should draw the outdoor usage as a water drop, pointed at the top and round at the bottom', () => {
@@ -200,15 +216,14 @@ describe('thinnestUsageIconDetail', () => {
     }
   });
 
-  it('should give the thinnest of the ellipse width, the rim around the ellipses and the gap between the middle ellipse and the others for the metal', () => {
+  it('should give the thinnest of the ellipse width, the rim around the ellipses and the gap between neighbour ellipses for the metal', () => {
     const { holes } = silhouetteOf('metal');
 
-    const isMiddle = (hole) => sideOf(centerOf(sampledPointsOf(hole)).x) === 0;
-    const middle = holes.find(isMiddle);
-    const gapAroundMiddle = Math.min(...holes.filter((hole) => !isMiddle(hole)).map((hole) => smallestDistanceBetween(middle, hole)));
-    const farthestReach = Math.max(...holes.flatMap((hole) => sampledPointsOf(hole, DENSE_SAMPLING)).map(({ x, y }) => Math.max(Math.abs(x), Math.abs(y))));
-    const ellipseWidth = heightOf(extentOf(sampledPointsOf(holes.find((hole) => !isMiddle(hole)), DENSE_SAMPLING).map(({ x, y }) => ({ x: (x - y) / Math.SQRT2, y: (x + y) / Math.SQRT2 }))));
-    const expected = Math.min(gapAroundMiddle, UNIT_HALF_SIZE - farthestReach, ellipseWidth);
+    const sampledHoles = holes.map((hole) => sampledPointsOf(hole, DENSE_SAMPLING));
+    const ellipseWidths = sampledHoles.map((points) => 2 * Math.min(...points.map((point) => distanceBetween(point, centerOf(points)))));
+    const farthestReach = Math.max(...sampledHoles.flat().map(({ x, y }) => Math.max(Math.abs(x), Math.abs(y))));
+    const gaps = holes.flatMap((hole, index) => holes.slice(index + 1).map((other) => smallestDistanceBetween(hole, other)));
+    const expected = Math.min(...ellipseWidths, UNIT_HALF_SIZE - farthestReach, ...gaps);
     assert.ok(Math.abs(thinnestUsageIconDetail('metal') - expected) < CURVE_SAMPLING_TOLERANCE);
   });
 
