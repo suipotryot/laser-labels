@@ -147,3 +147,11 @@ button:disabled {
   background: #fff;
   border-radius: 6px;
 }
+
+.language {
+  display: inline-flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin-top: 0.75rem;
+  color: var(--text-muted);
+}

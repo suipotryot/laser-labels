@@ -8,13 +8,17 @@ import { hasDetailsTooSmallToEngrave } from './label/labelReadability.js';
 import { buildFileName } from './label/fileName.js';
 import { downloadSvg } from './download.js';
 import { loadEngravingFont } from './text/loadEngravingFont.js';
+import { languages, translate } from './i18n/translate.js';
+import { readStoredLanguage, storeLanguage } from './i18n/storedLanguage.js';
 
-const SMALL_DETAILS_NOTICE = "Certains détails sont très petits : ils risquent d'être illisibles une fois gravés.";
-const FONT_LOADING_FAILURE_NOTICE = "La police de gravure n'a pas pu être chargée : rechargez la page.";
-const FONT_LOADING_NOTICE = "Chargement de la police de gravure…";
-const UNEXPECTED_ERROR_NOTICE = "Une erreur inattendue empêche de dessiner l'étiquette.";
+let language = readStoredLanguage(localStorage);
+
+function textFor(key, parameters) {
+  return translate(language, key, parameters);
+}
 
 const form = document.getElementById('label-form');
+const languageSelect = document.getElementById('language');
 const widthInput = document.getElementById('width');
 const heightInput = document.getElementById('height');
 const hasFrameCheckbox = document.getElementById('has-frame');
@@ -29,34 +33,57 @@ const previewStatus = document.getElementById('preview-status');
 const preview = document.getElementById('preview');
 const downloadButton = document.getElementById('download');
 
-function toOption({ key, name }) {
-  return new Option(name, key);
+function translateStaticTexts() {
+  document.documentElement.lang = language;
+  for (const element of document.querySelectorAll('[data-i18n]')) {
+    element.textContent = textFor(element.dataset.i18n);
+  }
+}
+
+function populateLanguages() {
+  languageSelect.replaceChildren(...languages.map((code) => new Option(code.toUpperCase(), code)));
+  languageSelect.value = language;
+}
+
+function repopulateKeepingChoice(select, populate) {
+  const chosenIndex = Math.max(select.selectedIndex, 0);
+  populate();
+  select.selectedIndex = chosenIndex;
+}
+
+function toTranslatedOption(prefix) {
+  return ({ key }) => new Option(textFor(`${prefix}.${key}`), key);
 }
 
 function populateHardwareTypes() {
-  hardwareTypeSelect.replaceChildren(...hardwareTypes.map(toOption));
+  hardwareTypeSelect.replaceChildren(...hardwareTypes.map(toTranslatedOption('hardware')));
 }
 
-function toUsageCheckbox({ key, name }) {
+function toUsageCheckbox({ key }) {
   const checkbox = document.createElement('input');
   checkbox.type = 'checkbox';
   checkbox.value = key;
   const label = document.createElement('label');
-  label.append(checkbox, ` ${name}`);
+  label.append(checkbox, ` ${textFor(`usage.${key}`)}`);
   return label;
-}
-
-function populateUsages() {
-  usageFields.append(...usageTypes.map(toUsageCheckbox));
 }
 
 function readTickedUsages() {
   return Array.from(usageFields.querySelectorAll('input:checked'), (checkbox) => checkbox.value);
 }
 
+function populateUsages() {
+  const tickedUsages = readTickedUsages();
+  usageFields.querySelectorAll('label').forEach((label) => label.remove());
+  usageFields.append(...usageTypes.map(toUsageCheckbox));
+  for (const checkbox of usageFields.querySelectorAll('input')) {
+    checkbox.checked = tickedUsages.includes(checkbox.value);
+  }
+}
+
 function populateDriveTypes() {
-  const noDrive = new Option('Aucune', NO_DRIVE);
-  driveTypeSelect.replaceChildren(noDrive, ...driveTypes.map(toOption));
+  const noDrive = new Option(textFor('drive.none'), NO_DRIVE);
+  driveTypeSelect.replaceChildren(noDrive, ...driveTypes.map(toTranslatedOption('drive')));
 }
 
 function sizesOfChosenDriveType() {
@@ -96,6 +123,7 @@ function readFormFields() {
 }
 
 let engravingFont = null;
+let hasFontLoadingFailed = false;
 let previewedLabel = null;
 
 function rememberPreviewedLabel(label) {
@@ -120,11 +148,11 @@ function showMessages({ error = '', status = '' }) {
 }
 
 function smallDetailsWarningFor(spec) {
-  return hasDetailsTooSmallToEngrave(spec, engravingFont) ? SMALL_DETAILS_NOTICE : '';
+  return hasDetailsTooSmallToEngrave(spec, engravingFont) ? textFor('notice.smallDetails') : '';
 }
 
 function previewLabel(spec) {
-  rememberPreviewedLabel({ svg: renderLabel(spec, engravingFont), fileName: buildFileName(spec) });
+  rememberPreviewedLabel({ svg: renderLabel(spec, engravingFont), fileName: buildFileName(spec, language) });
   preview.innerHTML = previewedLabel.svg;
   preview.classList.remove('is-outdated');
   showMessages({ status: smallDetailsWarningFor(spec) });
@@ -138,12 +166,12 @@ function clearPreview() {
 function explainInvalidField(error) {
   forgetPreviewedLabel();
   preview.classList.add('is-outdated');
-  showMessages({ error: describeLabelSpecError(error) });
+  showMessages({ error: describeLabelSpecError(language, error) });
 }
 
 function explainUnexpectedError(error) {
   clearPreview();
-  showMessages({ error: UNEXPECTED_ERROR_NOTICE });
+  showMessages({ error: textFor('notice.unexpectedError') });
   throw error;
 }
 
@@ -170,16 +198,48 @@ function startPreviewingWith(font) {
 }
 
 function explainFontLoadingFailure(error) {
-  showMessages({ error: FONT_LOADING_FAILURE_NOTICE });
+  hasFontLoadingFailed = true;
+  showFontLoadingState();
   throw error;
 }
 
-populateHardwareTypes();
-populateUsages();
-populateDriveTypes();
+function showFontLoadingState() {
+  if (hasFontLoadingFailed) {
+    showMessages({ error: textFor('notice.fontLoadingFailure') });
+  } else {
+    showMessages({ status: textFor('notice.fontLoading') });
+  }
+}
+
+function refreshMessagesAndPreview() {
+  if (engravingFont) {
+    refreshPreview();
+  } else {
+    showFontLoadingState();
+  }
+}
+
+function populateChoices() {
+  repopulateKeepingChoice(hardwareTypeSelect, populateHardwareTypes);
+  populateUsages();
+  repopulateKeepingChoice(driveTypeSelect, populateDriveTypes);
+}
+
+function changeLanguage() {
+  language = languageSelect.value;
+  translateStaticTexts();
+  populateChoices();
+  refreshMessagesAndPreview();
+  storeLanguage(localStorage, language);
+}
+
+populateLanguages();
+translateStaticTexts();
+populateChoices();
 populateDriveSizes();
 showDriveFieldsOnlyForHardwareWithDrive();
-showMessages({ status: FONT_LOADING_NOTICE });
+showFontLoadingState();
+languageSelect.addEventListener('input', changeLanguage);
 hardwareTypeSelect.addEventListener('input', showDriveFieldsOnlyForHardwareWithDrive);
 driveTypeSelect.addEventListener('input', populateDriveSizes);
 downloadButton.addEventListener('click', downloadPreviewedLabel);

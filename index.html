@@ -9,35 +9,39 @@
 <body>
   <header>
     <h1>Laser labels</h1>
-    <p class="subtitle">Étiquettes SVG pour graver le contenu de vos boîtes de quincaillerie.</p>
+    <p class="subtitle" data-i18n="ui.subtitle"></p>
+    <label class="language">
+      <span data-i18n="ui.language"></span>
+      <select id="language"></select>
+    </label>
   </header>
   <main>
     <form id="label-form" novalidate>
       <fieldset>
-        <legend>Étiquette</legend>
-        <label>Largeur (mm) <input id="width" inputmode="decimal" value="60" /></label>
-        <label>Hauteur (mm) <input id="height" inputmode="decimal" value="20" /></label>
-        <label><input id="has-frame" type="checkbox" /> Cadre</label>
+        <legend data-i18n="ui.label"></legend>
+        <label><span data-i18n="ui.width"></span> <input id="width" inputmode="decimal" value="60" /></label>
+        <label><span data-i18n="ui.height"></span> <input id="height" inputmode="decimal" value="20" /></label>
+        <label><input id="has-frame" type="checkbox" /> <span data-i18n="ui.frame"></span></label>
       </fieldset>
       <fieldset>
-        <legend>Pièce</legend>
-        <label>Type de quincaillerie <select id="hardware-type"></select></label>
-        <label>Dimensions de la pièce <input id="dimensions" placeholder="3,5x50" /></label>
+        <legend data-i18n="ui.part"></legend>
+        <label><span data-i18n="ui.hardwareType"></span> <select id="hardware-type"></select></label>
+        <label><span data-i18n="ui.dimensions"></span> <input id="dimensions" placeholder="3,5x50" /></label>
       </fieldset>
       <fieldset id="usage-fields">
-        <legend>Usage</legend>
+        <legend data-i18n="ui.usage"></legend>
       </fieldset>
       <fieldset id="drive-fields">
-        <legend>Empreinte</legend>
-        <label>Type d'empreinte <select id="drive-type"></select></label>
-        <label>Taille d'empreinte <select id="drive-size"></select></label>
+        <legend data-i18n="ui.drive"></legend>
+        <label><span data-i18n="ui.driveType"></span> <select id="drive-type"></select></label>
+        <label><span data-i18n="ui.driveSize"></span> <select id="drive-size"></select></label>
       </fieldset>
     </form>
     <section class="result">
       <p id="error-message" role="alert"></p>
       <p id="preview-status" role="status"></p>
       <div id="preview"></div>
-      <button id="download" type="button" disabled>Télécharger</button>
+      <button id="download" type="button" disabled data-i18n="ui.download"></button>
     </section>
   </main>
   <script type="module" src="src/main.js"></script>

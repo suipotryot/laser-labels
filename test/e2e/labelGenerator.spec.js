@@ -2,9 +2,10 @@ import { readFile } from 'node:fs/promises';
 import { test, expect } from '@playwright/test';
 import { hardwareTypes } from '../../src/catalog/hardwareTypes.js';
 import { usageTypes } from '../../src/catalog/usageTypes.js';
+import { translate } from '../../src/i18n/translate.js';
 
-const FONT_LOADING_FAILURE_NOTICE = "La police de gravure n'a pas pu être chargée : rechargez la page.";
-const SMALL_DETAILS_NOTICE = "Certains détails sont très petits : ils risquent d'être illisibles une fois gravés.";
+const FONT_LOADING_FAILURE_NOTICE = translate('fr', 'notice.fontLoadingFailure');
+const SMALL_DETAILS_NOTICE = translate('fr', 'notice.smallDetails');
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/');
@@ -25,7 +26,7 @@ function previewSvgOf(page) {
 }
 
 function downloadButtonOf(page) {
-  return page.getByRole('button', { name: 'Télécharger' });
+  return page.locator('#download');
 }
 
 async function downloadLabel(page) {
@@ -266,8 +267,8 @@ test.describe('hardware type select', () => {
   test('should draw the silhouette of every hardware type of the catalog', async ({ page }) => {
     await fillScrewLabel(page);
 
-    for (const { key, name } of hardwareTypes) {
-      await page.getByLabel('Type de quincaillerie').selectOption({ label: name });
+    for (const { key } of hardwareTypes) {
+      await page.getByLabel('Type de quincaillerie').selectOption({ label: translate('fr', `hardware.${key}`) });
 
       await expect(previewSvgOf(page).locator('path[data-hardware-outline]')).toHaveAttribute('data-hardware-outline', key);
     }
@@ -314,8 +315,8 @@ test.describe('usage checkboxes', () => {
   });
 
   test('should draw the icon of every usage of the catalog once ticked', async ({ page }) => {
-    for (const { key, name } of usageTypes) {
-      await page.getByLabel(name).check();
+    for (const { key } of usageTypes) {
+      await page.getByLabel(translate('fr', `usage.${key}`)).check();
 
       await expect(page.locator(`#preview svg path[data-usage-icon="${key}"]`)).toHaveCount(1);
     }
@@ -405,5 +406,88 @@ test.describe('download button', () => {
     await page.getByLabel('Largeur (mm)').fill('abc');
 
     await expect(downloadButtonOf(page)).toBeDisabled();
+  });
+});
+
+test.describe('language select', () => {
+  function languageSelectOf(page) {
+    return page.locator('#language');
+  }
+
+  async function switchToEnglish(page) {
+    await languageSelectOf(page).selectOption('en');
+  }
+
+  test('should show the form in French by default', async ({ page }) => {
+    await expect(page.locator('html')).toHaveAttribute('lang', 'fr');
+    await expect(page.getByLabel('Largeur (mm)')).toBeVisible();
+  });
+
+  test('should translate the form once English is chosen', async ({ page }) => {
+    await switchToEnglish(page);
+
+    await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+    await expect(page.getByLabel('Width (mm)')).toBeVisible();
+    await expect(page.getByLabel('Hardware type').locator('option', { hasText: 'Eye screw' })).toHaveCount(1);
+    await expect(page.getByLabel('Outdoor')).toBeVisible();
+    await expect(downloadButtonOf(page)).toHaveText('Download');
+  });
+
+  test('should explain an invalid field in the chosen language', async ({ page }) => {
+    await switchToEnglish(page);
+
+    await page.getByLabel('Width (mm)').fill('abc');
+
+    await expect(page.getByRole('alert')).toHaveText('The width must be a positive number (in mm).');
+  });
+
+  test('should explain the current error in the new language once it is chosen', async ({ page }) => {
+    await page.getByLabel('Largeur (mm)').fill('abc');
+
+    await switchToEnglish(page);
+
+    await expect(page.getByRole('alert')).toHaveText('The width must be a positive number (in mm).');
+  });
+
+  test('should download the file under a name in the chosen language', async ({ page }) => {
+    await switchToEnglish(page);
+    await page.getByLabel('Part dimensions').fill('3,5x50');
+    await page.getByLabel('Concrete / masonry').check();
+
+    const download = await downloadLabel(page);
+
+    expect(download.suggestedFilename()).toBe('screw-3,5x50-concrete-masonry.svg');
+  });
+
+  test('should keep the chosen hardware, drive and usages when the language changes', async ({ page }) => {
+    await fillScrewLabel(page);
+    await page.getByLabel('Extérieur').check();
+
+    await switchToEnglish(page);
+
+    await expect(page.getByLabel('Hardware type')).toHaveValue('screw');
+    await expect(page.getByLabel('Drive type')).toHaveValue('pozidriv');
+    await expect(page.getByLabel('Drive size')).toHaveValue('PZ2');
+    await expect(page.getByLabel('Outdoor')).toBeChecked();
+  });
+
+  test('should start in French and warn when the stored language is not supported', async ({ page }) => {
+    const warnings = [];
+    page.on('console', (message) => message.type() === 'warning' && warnings.push(message.text()));
+    await page.evaluate(() => localStorage.setItem('laser-labels.language', 'de'));
+
+    await page.reload();
+
+    await expect(page.getByLabel('Largeur (mm)')).toBeVisible();
+    expect(warnings.join(' ')).toContain('Unknown language: de');
+  });
+
+  test('should remember the chosen language after a reload', async ({ page }) => {
+    await switchToEnglish(page);
+
+    await page.reload();
+
+    await expect(languageSelectOf(page)).toHaveValue('en');
+    await expect(page.getByLabel('Width (mm)')).toBeVisible();
   });
 });
