@@ -1,12 +1,13 @@
 import { FULL_TURN, QUARTER_TURN, arc, closed, ellipse, hollow, pointOnCircle, polyline, rectangle, solid } from './contours.js';
 
-const TREAD_ELLIPSE = { semiMajor: 0.48, semiMinor: 0.16, gridOffset: 0.5, lean: QUARTER_TURN / 2 };
+const TREAD_ELLIPSE = { semiMajor: 0.4, semiMinor: 0.13, gridOffset: 0.5, lean: QUARTER_TURN / 2 };
 const DROP = { bulbCenter: { x: 0, y: 0.35 }, bulbRadius: 0.65, tipY: -1 };
 const REFLECTION = { outerRadius: 0.5, innerRadius: 0.38, fromAngle: (10 / 360) * FULL_TURN, toAngle: (-70 / 360) * FULL_TURN };
 const MASONRY = { bottomJointOffset: 0.5 };
 
 const TREAD_ELLIPSE_REACH = TREAD_ELLIPSE.gridOffset + Math.hypot(TREAD_ELLIPSE.semiMajor, TREAD_ELLIPSE.semiMinor) / Math.SQRT2;
 const RIM_AROUND_TREAD_ELLIPSES = 1 - TREAD_ELLIPSE_REACH;
+const GAP_AROUND_MIDDLE_ELLIPSE = TREAD_ELLIPSE.gridOffset * Math.SQRT2 - TREAD_ELLIPSE.semiMajor - TREAD_ELLIPSE.semiMinor;
 const REFLECTION_THICKNESS = REFLECTION.outerRadius - REFLECTION.innerRadius;
 const RIM_AROUND_REFLECTION = DROP.bulbRadius - REFLECTION.outerRadius;
 
@@ -24,9 +25,18 @@ function treadEllipseAt(side) {
   }));
 }
 
+function middleTreadEllipse() {
+  return hollow(ellipse({
+    center: { x: 0, y: 0 },
+    semiMajor: TREAD_ELLIPSE.semiMajor,
+    semiMinor: TREAD_ELLIPSE.semiMinor,
+    angle: TREAD_ELLIPSE.lean,
+  }));
+}
+
 function drawTreadPlate() {
-  const sides = [-1, 1].flatMap((x) => [-1, 1].map((y) => ({ x, y })));
-  return { outline: [...drawSquare(), ...sides.flatMap(treadEllipseAt)], strokes: [] };
+  const quarters = [-1, 1].flatMap((x) => [-1, 1].map((y) => ({ x, y })));
+  return { outline: [...drawSquare(), ...quarters.flatMap(treadEllipseAt), ...middleTreadEllipse()], strokes: [] };
 }
 
 function drawWaterDropBody() {
@@ -72,7 +82,7 @@ function drawBrickWall() {
 }
 
 const USAGE_ICONS = {
-  metal: { draw: drawTreadPlate, thinnestDetail: Math.min(2 * TREAD_ELLIPSE.semiMinor, RIM_AROUND_TREAD_ELLIPSES) },
+  metal: { draw: drawTreadPlate, thinnestDetail: Math.min(2 * TREAD_ELLIPSE.semiMinor, RIM_AROUND_TREAD_ELLIPSES, GAP_AROUND_MIDDLE_ELLIPSE) },
   outdoor: { draw: drawWaterDrop, thinnestDetail: Math.min(REFLECTION_THICKNESS, RIM_AROUND_REFLECTION) },
   masonry: { draw: drawBrickWall, thinnestDetail: Math.min(MASONRY.bottomJointOffset, 1 - MASONRY.bottomJointOffset) },
 };
