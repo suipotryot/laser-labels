@@ -12,6 +12,7 @@ export const en = {
   'ui.driveType': 'Drive type',
   'ui.driveSize': 'Drive size',
   'ui.download': 'Download',
+  'ui.imageUrl': 'Image URL',
   'ui.language': 'Language',
 
   'notice.smallDetails': 'Some details are very small: they may be unreadable once engraved.',

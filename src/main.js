@@ -6,6 +6,7 @@ import { describeLabelSpecError } from './label/errorMessages.js';
 import { renderLabel } from './label/renderLabel.js';
 import { hasDetailsTooSmallToEngrave } from './label/labelReadability.js';
 import { buildFileName } from './label/fileName.js';
+import { buildLabelFieldsQuery } from './label/labelFieldsQuery.js';
 import { downloadSvg } from './download.js';
 import { loadEngravingFont } from './text/loadEngravingFont.js';
 import { languages, translate } from './i18n/translate.js';
@@ -32,6 +33,7 @@ const errorMessage = document.getElementById('error-message');
 const previewStatus = document.getElementById('preview-status');
 const preview = document.getElementById('preview');
 const downloadButton = document.getElementById('download');
+const imageUrlInput = document.getElementById('image-url');
 
 function translateStaticTexts() {
   document.documentElement.lang = language;
@@ -126,6 +128,20 @@ let engravingFont = null;
 let hasFontLoadingFailed = false;
 let previewedLabel = null;
 
+function buildImageUrl(formFields) {
+  const url = new URL(location.href);
+  url.search = `mode=image&${buildLabelFieldsQuery(formFields)}`;
+  return url.href;
+}
+
+function showImageUrl(formFields) {
+  imageUrlInput.value = buildImageUrl(formFields);
+}
+
+function hideImageUrl() {
+  imageUrlInput.value = '';
+}
+
 function rememberPreviewedLabel(label) {
   previewedLabel = label;
   downloadButton.disabled = false;
@@ -134,6 +150,7 @@ function rememberPreviewedLabel(label) {
 function forgetPreviewedLabel() {
   previewedLabel = null;
   downloadButton.disabled = true;
+  hideImageUrl();
 }
 
 function updateText(element, text) {
@@ -151,8 +168,9 @@ function smallDetailsWarningFor(spec) {
   return hasDetailsTooSmallToEngrave(spec, engravingFont) ? textFor('notice.smallDetails') : '';
 }
 
-function previewLabel(spec) {
+function previewLabel(spec, formFields) {
   rememberPreviewedLabel({ svg: renderLabel(spec, engravingFont), fileName: buildFileName(spec, language) });
+  showImageUrl(formFields);
   preview.innerHTML = previewedLabel.svg;
   preview.classList.remove('is-outdated');
   showMessages({ status: smallDetailsWarningFor(spec) });
@@ -177,7 +195,8 @@ function explainUnexpectedError(error) {
 
 function refreshPreview() {
   try {
-    previewLabel(readLabelSpec(readFormFields(), engravingFont));
+    const formFields = readFormFields();
+    previewLabel(readLabelSpec(formFields, engravingFont), formFields);
   } catch (error) {
     if (error instanceof LabelSpecError) {
       explainInvalidField(error);
