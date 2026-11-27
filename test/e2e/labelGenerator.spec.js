@@ -409,6 +409,49 @@ test.describe('download button', () => {
   });
 });
 
+test.describe('copy URL button', () => {
+  function copyUrlButtonOf(page) {
+    return page.getByRole('button', { name: "Copier l'URL" });
+  }
+
+  test('should copy the URL that generates the drawn label', async ({ page, context }) => {
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    await fillScrewLabel(page);
+
+    await copyUrlButtonOf(page).click();
+
+    const imageUrl = await page.getByLabel("URL de l'image").inputValue();
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(imageUrl);
+  });
+
+  test('should confirm the copy', async ({ page, context }) => {
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+
+    await copyUrlButtonOf(page).click();
+
+    await expect(page.getByRole('button', { name: 'URL copiée !' })).toBeVisible();
+  });
+
+  test('should be disabled while a field is invalid', async ({ page }) => {
+    await fillScrewLabel(page);
+
+    await page.getByLabel('Largeur (mm)').fill('abc');
+
+    await expect(copyUrlButtonOf(page)).toBeDisabled();
+  });
+
+  test('should report the failure when the clipboard refuses the copy', async ({ page }) => {
+    await page.evaluate(() => {
+      navigator.clipboard.writeText = () => Promise.reject(new Error('clipboard refused'));
+    });
+    const pageErrorPromise = page.waitForEvent('pageerror');
+
+    await copyUrlButtonOf(page).click();
+
+    expect((await pageErrorPromise).message).toBe('clipboard refused');
+  });
+});
+
 test.describe('image URL field', () => {
   function imageUrlOf(page) {
     return page.getByLabel("URL de l'image");

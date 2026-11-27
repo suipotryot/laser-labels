@@ -33,6 +33,7 @@ const errorMessage = document.getElementById('error-message');
 const previewStatus = document.getElementById('preview-status');
 const preview = document.getElementById('preview');
 const downloadButton = document.getElementById('download');
+const copyUrlButton = document.getElementById('copy-url');
 const imageUrlInput = document.getElementById('image-url');
 
 function translateStaticTexts() {
@@ -124,6 +125,8 @@ function readFormFields() {
   };
 }
 
+const COPY_CONFIRMATION_DURATION_MS = 2000;
+
 let engravingFont = null;
 let hasFontLoadingFailed = false;
 let previewedLabel = null;
@@ -145,11 +148,13 @@ function hideImageUrl() {
 function rememberPreviewedLabel(label) {
   previewedLabel = label;
   downloadButton.disabled = false;
+  copyUrlButton.disabled = false;
 }
 
 function forgetPreviewedLabel() {
   previewedLabel = null;
   downloadButton.disabled = true;
+  copyUrlButton.disabled = true;
   hideImageUrl();
 }
 
@@ -210,6 +215,18 @@ function downloadPreviewedLabel() {
   downloadSvg(previewedLabel.svg, previewedLabel.fileName);
 }
 
+function showCopyConfirmation() {
+  copyUrlButton.textContent = textFor('ui.urlCopied');
+  setTimeout(() => {
+    copyUrlButton.textContent = textFor('ui.copyUrl');
+  }, COPY_CONFIRMATION_DURATION_MS);
+}
+
+async function copyImageUrl() {
+  await navigator.clipboard.writeText(imageUrlInput.value);
+  showCopyConfirmation();
+}
+
 function startPreviewingWith(font) {
   engravingFont = font;
   form.addEventListener('input', refreshPreview);
@@ -262,4 +279,5 @@ languageSelect.addEventListener('input', changeLanguage);
 hardwareTypeSelect.addEventListener('input', showDriveFieldsOnlyForHardwareWithDrive);
 driveTypeSelect.addEventListener('input', populateDriveSizes);
 downloadButton.addEventListener('click', downloadPreviewedLabel);
+copyUrlButton.addEventListener('click', copyImageUrl);
 loadEngravingFont().then(startPreviewingWith, explainFontLoadingFailure);

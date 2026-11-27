@@ -12,6 +12,8 @@ export const en = {
   'ui.driveType': 'Drive type',
   'ui.driveSize': 'Drive size',
   'ui.download': 'Download',
+  'ui.copyUrl': 'Copy URL',
+  'ui.urlCopied': 'URL copied!',
   'ui.imageUrl': 'Image URL',
   'ui.language': 'Language',
 

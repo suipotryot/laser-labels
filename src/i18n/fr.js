@@ -12,6 +12,8 @@ export const fr = {
   'ui.driveType': "Type d'empreinte",
   'ui.driveSize': "Taille d'empreinte",
   'ui.download': 'Télécharger',
+  'ui.copyUrl': "Copier l'URL",
+  'ui.urlCopied': 'URL copiée !',
   'ui.imageUrl': "URL de l'image",
   'ui.language': 'Langue',
 
