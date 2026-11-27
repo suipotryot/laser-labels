@@ -6,9 +6,9 @@ import { buildLabelFieldsQuery, readLabelFieldsFromQuery } from '../../src/label
 
 describe('readLabelFieldsFromQuery', () => {
   it('should read every form field from the query string', () => {
-    const query = '?width=60&height=20&hardwareType=screw&driveType=pozidriv&driveSize=PZ2&dimensions=3%2C5x50&hasFrame=true&usages=metal,outdoor';
+    const queryString = '?width=60&height=20&hardwareType=screw&driveType=pozidriv&driveSize=PZ2&dimensions=3%2C5x50&hasFrame=true&usages=metal,outdoor';
 
-    assert.deepEqual(readLabelFieldsFromQuery(query), {
+    assert.deepEqual(readLabelFieldsFromQuery(queryString), {
       width: '60',
       height: '20',
       hardwareType: 'screw',
@@ -35,15 +35,29 @@ describe('readLabelFieldsFromQuery', () => {
 
   for (const field of ['width', 'height', 'hardwareType']) {
     it(`should refuse a query without the required ${field}`, () => {
-      const query = new URLSearchParams({ width: '60', height: '20', hardwareType: 'washer' });
-      query.delete(field);
+      const searchParams = new URLSearchParams({ width: '60', height: '20', hardwareType: 'washer' });
+      searchParams.delete(field);
 
       assert.throws(
-        () => readLabelFieldsFromQuery(query.toString()),
+        () => readLabelFieldsFromQuery(searchParams.toString()),
         (error) => error instanceof LabelSpecError && error.field === field && error.reason === 'missing',
       );
     });
   }
+
+  it('should refuse a frame that is neither true nor false', () => {
+    assert.throws(
+      () => readLabelFieldsFromQuery('?width=60&height=20&hardwareType=washer&hasFrame=yes'),
+      (error) => error instanceof LabelSpecError && error.field === 'hasFrame' && error.reason === 'invalid',
+    );
+  });
+
+  it('should refuse a drive size given without any drive type', () => {
+    assert.throws(
+      () => readLabelFieldsFromQuery('?width=60&height=20&hardwareType=screw&driveSize=PZ2'),
+      (error) => error instanceof LabelSpecError && error.field === 'driveType' && error.reason === 'missing',
+    );
+  });
 });
 
 describe('buildLabelFieldsQuery', () => {

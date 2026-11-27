@@ -1,8 +1,10 @@
 import { test, expect } from '@playwright/test';
 
-async function askImageInHiddenFrame(page, query) {
+const ANSWER_TIMEOUT_MILLISECONDS = 5000;
+
+async function askImageInHiddenFrame(page, queryString) {
   await page.goto('/');
-  return page.evaluate((frameQuery) => new Promise((resolve) => {
+  return page.evaluate(({ frameQuery, timeoutMilliseconds }) => new Promise((resolve, reject) => {
     const frame = document.createElement('iframe');
     frame.hidden = true;
     window.addEventListener('message', (event) => {
@@ -10,9 +12,10 @@ async function askImageInHiddenFrame(page, query) {
         resolve(event.data);
       }
     });
+    setTimeout(() => reject(new Error(`No answer from the image mode after ${timeoutMilliseconds} ms`)), timeoutMilliseconds);
     frame.src = `/?mode=image&${frameQuery}`;
     document.body.append(frame);
-  }), query);
+  }), { frameQuery: queryString, timeoutMilliseconds: ANSWER_TIMEOUT_MILLISECONDS });
 }
 
 test.describe('image mode', () => {
@@ -27,5 +30,15 @@ test.describe('image mode', () => {
     const answer = await askImageInHiddenFrame(page, 'width=2&height=20&hardwareType=washer');
 
     expect(answer).toEqual({ type: 'engraving-image-error', field: 'width', reason: 'tooSmall' });
+  });
+
+  test('should send an internal error when the engraving font cannot be loaded', async ({ page }) => {
+    await page.addInitScript(() => {
+      window.fetch = () => Promise.reject(new Error('Font loading refused by the test'));
+    });
+
+    const answer = await askImageInHiddenFrame(page, 'width=60&height=20&hardwareType=washer');
+
+    expect(answer).toEqual({ type: 'engraving-image-error', field: null, reason: 'internal' });
   });
 });

@@ -44,6 +44,11 @@ Une application qui l'embarque dans un `iframe` reçoit un `postMessage` :
 - `{ type: 'engraving-image', svg, widthMm, heightMm }` quand l'étiquette est valide ;
 - `{ type: 'engraving-image-error', field, reason }` quand un champ est refusé (`reason: 'missing'` si `width`, `height` ou `hardwareType` manque).
 
+- `{ type: 'engraving-image-error', field: null, reason: 'internal' }` quand la génération échoue (police introuvable, erreur inattendue) ;
+- pour `unengravableCharacters`, la réponse porte aussi `characters`.
+
+Les valeurs invalides de la requête sont refusées (`hasFrame` autre que `true` / `false`, `driveSize` sans `driveType`). La réponse ne contient pas d'identifiant de requête : l'application qui embarque filtre sur `event.source`, un `iframe` par image.
+
 Tout autre générateur d'images respectant ce contrat peut être utilisé de la même façon.
 
 ## Police

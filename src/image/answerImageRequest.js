@@ -11,8 +11,8 @@ function answerWithLabel(spec, font) {
   };
 }
 
-function answerWithRefusal({ field, reason }) {
-  return { type: 'engraving-image-error', field, reason };
+function answerWithRefusal({ field, reason, characters }) {
+  return { type: 'engraving-image-error', field, reason, ...(characters && { characters }) };
 }
 
 export function answerImageRequest(queryString, font) {

@@ -1,30 +1,45 @@
 import { NO_DRIVE } from '../catalog/driveTypes.js';
 import { LabelSpecError } from './labelSpec.js';
 
-function readRequired(query, field) {
-  const value = query.get(field);
+function readRequired(searchParams, field) {
+  const value = searchParams.get(field);
   if (value === null) {
     throw new LabelSpecError(field, 'missing');
   }
   return value;
 }
 
-function readUsages(query) {
-  const usages = query.get('usages');
+function readDriveType(searchParams) {
+  if (searchParams.has('driveSize') && !searchParams.has('driveType')) {
+    throw new LabelSpecError('driveType', 'missing');
+  }
+  return searchParams.get('driveType') ?? NO_DRIVE;
+}
+
+function readHasFrame(searchParams) {
+  const hasFrame = searchParams.get('hasFrame') ?? 'false';
+  if (hasFrame !== 'true' && hasFrame !== 'false') {
+    throw new LabelSpecError('hasFrame', 'invalid');
+  }
+  return hasFrame === 'true';
+}
+
+function readUsages(searchParams) {
+  const usages = searchParams.get('usages');
   return usages ? usages.split(',') : [];
 }
 
 export function readLabelFieldsFromQuery(queryString) {
-  const query = new URLSearchParams(queryString);
+  const searchParams = new URLSearchParams(queryString);
   return {
-    width: readRequired(query, 'width'),
-    height: readRequired(query, 'height'),
-    hardwareType: readRequired(query, 'hardwareType'),
-    driveType: query.get('driveType') ?? NO_DRIVE,
-    driveSize: query.get('driveSize') ?? '',
-    dimensions: query.get('dimensions') ?? '',
-    hasFrame: query.get('hasFrame') === 'true',
-    usages: readUsages(query),
+    width: readRequired(searchParams, 'width'),
+    height: readRequired(searchParams, 'height'),
+    hardwareType: readRequired(searchParams, 'hardwareType'),
+    driveType: readDriveType(searchParams),
+    driveSize: searchParams.get('driveSize') ?? '',
+    dimensions: searchParams.get('dimensions') ?? '',
+    hasFrame: readHasFrame(searchParams),
+    usages: readUsages(searchParams),
   };
 }
 
