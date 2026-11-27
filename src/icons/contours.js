@@ -269,6 +269,13 @@ function movedDrawing(drawing, movePoint) {
   return drawing.map((command) => withMovedPoints(command, movePoint));
 }
 
+export function ellipse({ center, semiMajor, semiMinor, angle }) {
+  return movedDrawing(circle(1), (point) => {
+    const turned = turnedBy({ x: point.x * semiMajor, y: point.y * semiMinor }, angle);
+    return { x: center.x + turned.x, y: center.y + turned.y };
+  });
+}
+
 export function placeInCircle(unitDrawing, { x, y, radius }) {
   return movedDrawing(unitDrawing, (point) => ({ x: x + point.x * radius, y: y + point.y * radius }));
 }

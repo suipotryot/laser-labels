@@ -12,6 +12,7 @@ const screwSpec = {
   drive: { type: 'pozidriv', size: 'PZ2' },
   dimensions: '3,5x50',
   hasFrame: false,
+  usages: [],
 };
 
 describe('chooseLayout', () => {
@@ -25,6 +26,13 @@ describe('chooseLayout', () => {
 
   it('should favour the text over the drawing, keeping a screw beside a short text on a short label', () => {
     assert.equal(chooseLayout({ ...screwSpec, width: 30, height: 20, dimensions: '4x30' }, font).orientation, 'sideBySide');
+  });
+
+  it('should leave room for the usages when choosing between text above the drawing and text beside it', () => {
+    const shortLabelSpec = { ...screwSpec, width: 30, height: 15, drive: null, dimensions: 'M8x40' };
+
+    assert.equal(chooseLayout(shortLabelSpec, font).orientation, 'stacked');
+    assert.equal(chooseLayout({ ...shortLabelSpec, usages: ['metal', 'outdoor', 'masonry'] }, font).orientation, 'sideBySide');
   });
 
   it('should put long dimensions above the screw, even on a wide label', () => {

@@ -13,6 +13,10 @@ const errorMessages = {
     unknown: "Type d'empreinte inconnu.",
   },
   driveSize: { unknown: "Cette taille ne correspond pas au type d'empreinte choisi." },
+  usages: {
+    unknown: "Cet usage n'existe pas.",
+    duplicated: "Un usage ne peut être coché qu'une fois.",
+  },
   dimensions: {
     tooLong: 'Les dimensions ne doivent pas dépasser 40 caractères.',
     nonPrintableCharacters: 'Les dimensions contiennent des caractères invisibles non gravables.',

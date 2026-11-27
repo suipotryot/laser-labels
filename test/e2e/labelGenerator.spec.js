@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { test, expect } from '@playwright/test';
 import { hardwareTypes } from '../../src/catalog/hardwareTypes.js';
+import { usageTypes } from '../../src/catalog/usageTypes.js';
 
 const FONT_LOADING_FAILURE_NOTICE = "La police de gravure n'a pas pu être chargée : rechargez la page.";
 const SMALL_DETAILS_NOTICE = "Certains détails sont très petits : ils risquent d'être illisibles une fois gravés.";
@@ -304,6 +305,28 @@ test.describe('hardware type select', () => {
     await page.getByLabel('Type de quincaillerie').selectOption({ label: 'Vis' });
 
     await expect(page.getByLabel("Type d'empreinte")).toBeVisible();
+  });
+});
+
+test.describe('usage checkboxes', () => {
+  test('should draw no usage icon until a usage is ticked', async ({ page }) => {
+    await expect(page.locator('#preview svg path[data-usage-icon]')).toHaveCount(0);
+  });
+
+  test('should draw the icon of every usage of the catalog once ticked', async ({ page }) => {
+    for (const { key, name } of usageTypes) {
+      await page.getByLabel(name).check();
+
+      await expect(page.locator(`#preview svg path[data-usage-icon="${key}"]`)).toHaveCount(1);
+    }
+  });
+
+  test('should remove the icon of a usage once unticked', async ({ page }) => {
+    await page.getByLabel('Extérieur').check();
+
+    await page.getByLabel('Extérieur').uncheck();
+
+    await expect(page.locator('#preview svg path[data-usage-icon]')).toHaveCount(0);
   });
 });
 

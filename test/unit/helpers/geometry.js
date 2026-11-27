@@ -46,3 +46,15 @@ export function pointOnCubicCurve(start, { x1, y1, x2, y2, x, y }, progress) {
     y: remaining ** 3 * start.y + 3 * remaining ** 2 * progress * y1 + 3 * remaining * progress ** 2 * y2 + progress ** 3 * y,
   };
 }
+
+export function sampledPointsOf(contour, samplesPerSegment = 4) {
+  const [move, ...segments] = contour.filter(({ type }) => type !== 'Z');
+  let segmentStart = move;
+  return [move, ...segments.flatMap((segment) => {
+    const points = segment.type === 'C'
+      ? Array.from({ length: samplesPerSegment }, (_, index) => pointOnCubicCurve(segmentStart, segment, (index + 1) / samplesPerSegment))
+      : [{ x: segment.x, y: segment.y }];
+    segmentStart = segment;
+    return points;
+  })];
+}

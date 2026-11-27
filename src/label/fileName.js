@@ -1,4 +1,5 @@
 import { findHardwareType } from '../catalog/hardwareTypes.js';
+import { findUsageType } from '../catalog/usageTypes.js';
 import { listLabelLines } from './listLabelLines.js';
 
 const FORBIDDEN_FILE_NAME_CHARACTERS = /[\\/:*?"<>|]/g;
@@ -9,7 +10,8 @@ function toFileNamePart(text) {
 
 function listFileNameParts(spec) {
   const hardwareName = findHardwareType(spec.hardwareType).name;
-  return [hardwareName, ...listLabelLines(spec).map(({ text }) => text)];
+  const usageNames = spec.usages.map((usage) => findUsageType(usage).name);
+  return [hardwareName, ...listLabelLines(spec).map(({ text }) => text), ...usageNames];
 }
 
 export function buildFileName(spec) {

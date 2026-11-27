@@ -1,7 +1,36 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { arc, circle, hollow, placeTogetherInBox, polygonWithRoundedCorners, polyline, rectangle, solid, starOfArms } from '../../src/icons/contours.js';
-import { extentOf, isAlmostEqual, pointOnCubicCurve, windingOf } from './helpers/geometry.js';
+import { arc, circle, ellipse, hollow, placeTogetherInBox, polygonWithRoundedCorners, polyline, rectangle, solid, starOfArms } from '../../src/icons/contours.js';
+import { extentOf, isAlmostEqual, pointOnCubicCurve, sampledPointsOf, windingOf } from './helpers/geometry.js';
+
+describe('ellipse', () => {
+  const center = { x: 1, y: 2 };
+
+  it('should stretch a circle to the semi-axes along the horizontal and vertical when not turned', () => {
+    const { left, right, top, bottom } = extentOf(ellipse({ center, semiMajor: 3, semiMinor: 1, angle: 0 }).filter(({ type }) => type !== 'Z'));
+
+    assert.ok(isAlmostEqual(right - left, 6) && isAlmostEqual(bottom - top, 2));
+  });
+
+  it('should lie on the ellipse turned counterclockwise on screen by the angle', () => {
+    const angle = Math.PI / 4;
+    const semiMajor = 3;
+    const semiMinor = 1;
+
+    for (const { x, y } of sampledPointsOf(ellipse({ center, semiMajor, semiMinor, angle }))) {
+      const along = (x - center.x) * Math.cos(angle) - (y - center.y) * Math.sin(angle);
+      const across = (x - center.x) * Math.sin(angle) + (y - center.y) * Math.cos(angle);
+      assert.ok(Math.abs((along / semiMajor) ** 2 + (across / semiMinor) ** 2 - 1) < 1e-3, 'a point leaves the ellipse');
+    }
+  });
+
+  it('should be one closed contour', () => {
+    const contour = ellipse({ center, semiMajor: 3, semiMinor: 1, angle: 0.3 });
+
+    assert.equal(contour.filter(({ type }) => type === 'M').length, 1);
+    assert.equal(contour.at(-1).type, 'Z');
+  });
+});
 
 describe('hollow', () => {
   it('should wind a contour counterclockwise on screen whatever the way it was drawn', () => {
