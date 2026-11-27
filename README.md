@@ -27,6 +27,10 @@ npm run deploy     # build + copie dans ../suipotryot.github.io/laser-labels
 - L'orientation est déduite des dimensions : plus haute que large → icône au-dessus du texte, sinon icône à gauche.
 - Le texte est converti en contours fermés (police embarquée, aucune dépendance aux polices installées) et ajusté pour tenir dans sa zone.
 
+## Langues
+
+L'interface est disponible en français (par défaut) et en anglais. Le choix est mémorisé dans le navigateur (`localStorage`) et détermine aussi le nom du fichier téléchargé. Les textes sont dans `src/i18n/fr.js` et `src/i18n/en.js` : une clé ajoutée dans l'une doit l'être dans l'autre (un test le vérifie). Le SVG ne contient que la dimension saisie et la taille d'empreinte, qui ne sont pas traduites.
+
 ## Police
 
 Le texte est gravé en [Barlow Semi Condensed](https://github.com/jpt/barlow) SemiBold, © 2017 The Barlow Project Authors, sous licence SIL Open Font License 1.1 (voir [src/text/fonts/OFL.txt](src/text/fonts/OFL.txt)).

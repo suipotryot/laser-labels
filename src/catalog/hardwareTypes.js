@@ -1,16 +1,16 @@
 export const hardwareTypes = [
-  { key: 'screw', name: 'Vis', hasDrive: true },
-  { key: 'nail', name: 'Clou', hasDrive: false },
-  { key: 'bolt', name: 'Boulon', hasDrive: false },
-  { key: 'nut', name: 'Écrou', hasDrive: false },
-  { key: 'hook', name: 'Crochet', hasDrive: false },
-  { key: 'eyeScrew', name: 'Piton', hasDrive: false },
-  { key: 'wallPlug', name: 'Cheville', hasDrive: false },
-  { key: 'mollyAnchor', name: 'Cheville Molly', hasDrive: false },
-  { key: 'washer', name: 'Rondelle', hasDrive: false },
-  { key: 'threadedRod', name: 'Tige filetée', hasDrive: false },
-  { key: 'rivet', name: 'Rivet', hasDrive: false },
-  { key: 'anchorBolt', name: "Goujon d'ancrage", hasDrive: false },
+  { key: 'screw', hasDrive: true },
+  { key: 'nail', hasDrive: false },
+  { key: 'bolt', hasDrive: false },
+  { key: 'nut', hasDrive: false },
+  { key: 'hook', hasDrive: false },
+  { key: 'eyeScrew', hasDrive: false },
+  { key: 'wallPlug', hasDrive: false },
+  { key: 'mollyAnchor', hasDrive: false },
+  { key: 'washer', hasDrive: false },
+  { key: 'threadedRod', hasDrive: false },
+  { key: 'rivet', hasDrive: false },
+  { key: 'anchorBolt', hasDrive: false },
 ];
 
 export function findHardwareType(key) {

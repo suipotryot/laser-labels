@@ -1,7 +1,7 @@
 export const usageTypes = [
-  { key: 'metal', name: 'Métal' },
-  { key: 'outdoor', name: 'Extérieur' },
-  { key: 'masonry', name: 'Béton / maçonnerie' },
+  { key: 'metal' },
+  { key: 'outdoor' },
+  { key: 'masonry' },
 ];
 
 export function findUsageType(key) {
