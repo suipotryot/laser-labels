@@ -59,8 +59,12 @@ function renderHardwareIcon(spec, font) {
   return `<path data-hardware-outline="${escapeXml(spec.hardwareType)}" d="${pathData}"/>` + renderOptionalHardwareStrokes(spec.hardwareType, strokes);
 }
 
-function renderUsageIcon({ usage, outline }) {
-  return `<path data-usage-icon="${escapeXml(usage)}" d="${toSvgPathData(outline)}"/>`;
+function renderUsageStrokes(usage, strokes) {
+  return strokes.length > 0 ? `<path data-usage-strokes="${escapeXml(usage)}" d="${toSvgPathData(strokes)}"/>` : '';
+}
+
+function renderUsageIcon({ usage, outline, strokes }) {
+  return `<path data-usage-icon="${escapeXml(usage)}" d="${toSvgPathData(outline)}"/>` + renderUsageStrokes(usage, strokes);
 }
 
 function renderUsageIcons(spec, font) {

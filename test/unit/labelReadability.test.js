@@ -39,10 +39,10 @@ describe('hasDetailsTooSmallToEngrave', () => {
   });
 
   it('should find a usage icon too detailed to engrave on a small label, even when everything else is readable', () => {
-    const smallNutSpec = { ...screwSpec, width: 30, height: 10, hardwareType: 'nut', drive: null, dimensions: '' };
+    const smallNutSpec = { ...screwSpec, width: 20, height: 10, hardwareType: 'nut', drive: null, dimensions: '' };
 
     assert.equal(hasDetailsTooSmallToEngrave(smallNutSpec, font), false);
-    assert.equal(hasDetailsTooSmallToEngrave({ ...smallNutSpec, usages: ['masonry'] }, font), true);
+    assert.equal(hasDetailsTooSmallToEngrave({ ...smallNutSpec, usages: ['metal'] }, font), true);
   });
 
   it('should find nothing too small on a usual label with every usage ticked', () => {

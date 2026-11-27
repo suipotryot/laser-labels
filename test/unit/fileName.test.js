@@ -17,6 +17,10 @@ describe('buildFileName', () => {
     assert.equal(buildFileName(screwSpec), 'vis-3,5x50-pz2.svg');
   });
 
+  it('should end the name with the ticked usages, in the order of the catalog', () => {
+    assert.equal(buildFileName({ ...screwSpec, usages: ['metal', 'masonry'] }), 'vis-3,5x50-pz2-métal-béton-maçonnerie.svg');
+  });
+
   it('should join words with dashes and drop characters forbidden in file names', () => {
     const spec = { ...screwSpec, hardwareType: 'mollyAnchor', drive: null, dimensions: '1/2" : M5 x 52 *?<>|\\' };
 

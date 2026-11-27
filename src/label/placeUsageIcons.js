@@ -4,8 +4,9 @@ import { drawUsageIcon } from '../icons/usageIcons.js';
 import { placeTogetherInBox } from '../icons/contours.js';
 
 function placeUsageIconInBox(usage, box) {
-  const { placedDrawings: [outline], scale } = placeTogetherInBox([drawUsageIcon(usage)], box);
-  return { usage, outline, scale };
+  const { outline, strokes } = drawUsageIcon(usage);
+  const { placedDrawings: [placedOutline, placedStrokes], scale } = placeTogetherInBox([outline, strokes], box);
+  return { usage, outline: placedOutline, strokes: placedStrokes, scale };
 }
 
 export function placeUsageIcons(spec, font) {

@@ -207,6 +207,18 @@ describe('renderLabel', () => {
     }
   });
 
+  it('should draw the joints of the masonry as strokes inside the icon zone, and no strokes for the other usages', () => {
+    const usagesSpec = { ...screwSpec, usages: ['metal', 'outdoor', 'masonry'] };
+    const { iconZone } = chooseLayout(usagesSpec, font);
+    const svg = parseSvg(renderLabel(usagesSpec, font));
+
+    const strokePaths = pathsWithAttribute(svg, 'data-usage-strokes');
+    assert.deepEqual(strokePaths.map((path) => path.getAttribute('data-usage-strokes')), ['masonry']);
+    for (const point of strokePaths.flatMap(onCurvePointsOf)) {
+      assert.ok(isInsideZone(point, iconZone), );
+    }
+  });
+
   it('should draw no usage icon when no usage is ticked', () => {
     const svg = parseSvg(renderLabel(screwSpec, font));
 
